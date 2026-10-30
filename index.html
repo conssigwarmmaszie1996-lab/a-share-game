@@ -5,39 +5,88 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>模拟大A游戏</title>
 <style>
-  :root { --bg:#0f1419; --card:#1a2332; --up:#ff4d4f; --down:#52c41a; --text:#e8e8e8; --muted:#8c8c8c; --accent:#1890ff; --short:#fa8c16; }
+  :root {
+    --bg: #0c0a09;
+    --card: #1c1614;
+    --up: #ff4d4f;
+    --down: #52c41a;
+    --text: #d4c8b8;
+    --muted: #8a7a6a;
+    --accent: #8b7355;
+    --short: #c47a4a;
+    --border: #2a221e;
+  }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC",sans-serif;background:var(--bg);color:var(--text);padding:16px;max-width:1200px;margin:0 auto}
-  h1{font-size:22px;margin-bottom:4px}
-  .subtitle{color:var(--muted);font-size:13px;margin-bottom:12px}
-  .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px}
-  .cash{font-size:18px;color:#faad14;font-weight:bold}
+  body{
+    font-family: "Georgia", "Times New Roman", serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 16px;
+    max-width: 1200px;
+    margin: 0 auto;
+    background-image: radial-gradient(ellipse at top, #1a1410 0%, #0c0a09 70%);
+  }
+  h1{font-size:24px;margin-bottom:4px;color:#e8dcc8;font-weight:normal;letter-spacing:1px}
+  .subtitle{color:var(--muted);font-size:13px;margin-bottom:12px;font-style:italic}
+  .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;border-bottom:1px solid var(--border);padding-bottom:12px}
+  .cash{font-size:18px;color:#c9a87c;font-weight:bold}
   .mode-bar{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
-  .mode-bar button.active{background:#52c41a}
+  .mode-bar button.active{background:#6b5a45;color:#f0e6d8}
   .indices{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
-  .index-card{background:var(--card);border-radius:10px;padding:10px;text-align:center}
+  .index-card{
+    background: linear-gradient(180deg, #241c18 0%, #1c1614 100%);
+    border:1px solid #3a2e28;
+    border-radius:6px;
+    padding:10px;
+    text-align:center;
+    box-shadow: inset 0 1px 0 rgba(255,220,180,0.05);
+  }
   .index-name{font-size:12px;color:var(--muted)}
   .index-price{font-size:20px;font-weight:bold;margin:2px 0}
   .index-change{font-size:12px}
   .up{color:var(--up)}.down{color:var(--down)}
-  .section{background:var(--card);border-radius:12px;padding:14px;margin-bottom:14px}
-  .section h2{font-size:15px;margin-bottom:10px}
+  .section{
+    background: linear-gradient(180deg, #1f1916 0%, #1c1614 100%);
+    border:1px solid #3a2e28;
+    border-radius:8px;
+    padding:14px;
+    margin-bottom:14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .section h2{font-size:15px;margin-bottom:10px;color:#d4c4a8;font-weight:normal}
   .search-bar{display:flex;gap:8px;margin-bottom:10px}
-  input,button,select{background:#2a3544;border:1px solid #3a4555;color:var(--text);padding:7px 10px;border-radius:8px;font-size:13px}
+  input,button,select{
+    background:#2a221e;
+    border:1px solid #4a3c34;
+    color:var(--text);
+    padding:7px 10px;
+    border-radius:4px;
+    font-size:13px;
+    font-family:inherit;
+  }
+  input:focus,select:focus{outline:none;border-color:#8b7355}
   input{flex:1;min-width:0}
-  button{background:var(--accent);border:none;cursor:pointer;font-weight:500}
-  button:hover{opacity:.9}
-  button.sell{background:#ff4d4f}button.short{background:var(--short)}
+  button{
+    background: linear-gradient(180deg, #6b5a45 0%, #5a4a38 100%);
+    border:1px solid #8b7355;
+    cursor:pointer;
+    font-weight:500;
+    color:#f0e6d8;
+  }
+  button:hover{filter:brightness(1.1)}
+  button.sell{background:linear-gradient(180deg,#8a3a3a 0%,#6a2a2a 100%);border-color:#aa5555}
+  button.short{background:linear-gradient(180deg,#8a5a3a 0%,#6a3a2a 100%);border-color:#c47a4a}
   table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{padding:7px 5px;text-align:left;border-bottom:1px solid #2a3544}
+  th,td{padding:7px 5px;text-align:left;border-bottom:1px solid #2a221e}
   th{color:var(--muted);font-weight:500}
   .actions button{padding:3px 7px;font-size:12px;margin-right:3px}
-  .update-time{font-size:12px;color:var(--muted);text-align:right;margin-top:6px}
+  .update-time{font-size:12px;color:var(--muted);text-align:right;margin-top:6px;font-style:italic}
   .portfolio-summary{display:flex;gap:14px;margin-bottom:10px;font-size:13px;flex-wrap:wrap}
-  .error{color:#ff4d4f;font-size:12px;margin-top:6px}
-  .tag{display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px}
-  .tag.long{background:#52c41a33;color:#52c41a}.tag.short{background:#fa8c1633;color:#fa8c16}
-  #klineBox{margin-top:12px;background:#121820;border-radius:8px;padding:8px}
+  .error{color:#ff6b6b;font-size:12px;margin-top:6px}
+  .tag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:11px}
+  .tag.long{background:#52c41a33;color:#52c41a}
+  .tag.short{background:#c47a4a33;color:#c47a4a}
+  #klineBox{margin-top:12px;background:#12100e;border:1px solid #3a2e28;border-radius:6px;padding:8px}
   canvas{width:100%;height:180px;display:block}
 </style>
 </head>
@@ -245,7 +294,7 @@ function renderPositions(){
     pnl+=p;
     return `<tr><td>${pos.name}</td><td>${code}</td><td><span class="tag ${isLong?'long':'short'}">${isLong?'多':'空'}</span></td><td>${abs}</td><td>${formatNum(pos.cost)}</td><td class="${getColor(isLong?price-pos.cost:pos.cost-price)}">${formatNum(price)}</td><td class="${getColor(p)}">${p>0?"+":""}${formatNum(p)}</td><td class="actions"><button class="sell" onclick="closePosition('${code}')">平仓</button></td></tr>`;
   }).join("");
-  document.getElementById("positions").innerHTML=rows||"<tr><td colspan='8' style='text-align:center;color:#8c8c8c'>暂无持仓</td></tr>";
+  document.getElementById("positions").innerHTML=rows||"<tr><td colspan='8' style='text-align:center;color:#8a7a6a'>暂无持仓</td></tr>";
   document.getElementById("marketValue").textContent=formatNum(mv);
   document.getElementById("totalAsset").textContent=formatNum(cash+mv);
   document.getElementById("pnl").textContent=(pnl>0?"+":"")+formatNum(pnl);
