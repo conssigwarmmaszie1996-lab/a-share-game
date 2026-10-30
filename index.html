@@ -53,7 +53,7 @@
   <div class="header">
     <div>
       <h1>模拟大A 游戏</h1>
-      <div class="subtitle">做多做空 · 离线进度条 · 分时图 · 仓位比例</div>
+      <div class="subtitle">做多做空 · K线 + 1分/5分分时图</div>
     </div>
     <div class="cash">可用资金：<span id="cash">100,000.00</span> 元</div>
   </div>
@@ -63,6 +63,10 @@
     <button id="btnOffline" onclick="setMode('offline')">模拟当日走势</button>
     <button onclick="resetGame()">重置游戏</button>
     <select id="chartSelect" onchange="drawCharts()"><option value="">选择图表</option></select>
+    <select id="minuteType" onchange="drawCharts()">
+      <option value="1">1分钟分时</option>
+      <option value="5">5分钟分时</option>
+    </select>
   </div>
 
   <div id="progressSection" style="display:none">
@@ -72,7 +76,7 @@
 
   <div class="indices" id="indices"></div>
   <div id="klineBox" style="display:none"><div style="font-size:12px;color:#8a7a6a;margin-bottom:4px">K线</div><canvas id="klineCanvas"></canvas></div>
-  <div id="minuteBox" style="display:none"><div style="font-size:12px;color:#8a7a6a;margin-bottom:4px">分时图</div><canvas id="minuteCanvas"></canvas></div>
+  <div id="minuteBox" style="display:none"><div style="font-size:12px;color:#8a7a6a;margin-bottom:4px" id="minuteTitle">分时图</div><canvas id="minuteCanvas"></canvas></div>
 
   <div class="section">
     <h2>自选股票</h2>
@@ -104,7 +108,7 @@
 
 <script>
 const INITIAL_CASH = 100000;
-const TOTAL_MINUTES = 240; // 模拟一天 240 分钟
+const TOTAL_MINUTES = 240;
 let cash = INITIAL_CASH;
 let mode = 'realtime';
 let watchlist = [
@@ -116,9 +120,11 @@ let watchlist = [
 let positions = {};
 let quotes = {};
 let klineData = {};
-let minuteData = {};
+let minuteData1 = {};
+let minuteData5 = {};
 let simTime = 0;
 let simInterval = null;
+let realTick = 0;
 
 const indices = [
   { name: "上证指数", secid: "1.000001", base: 3200 },
@@ -143,7 +149,11 @@ function setMode(m){
       document.getElementById("chartSelect").value=watchlist[0].code;
       drawCharts();
     }
-  } else updateAll();
+  } else {
+    realTick=0;
+    Object.keys(quotes).forEach(c=>{minuteData1[c]=[];minuteData5[c]=[];});
+    updateAll();
+  }
 }
 
 function initSimulation(){
@@ -154,7 +164,8 @@ function initSimulation(){
     const base=item.base||100;
     quotes[code]={name:item.name,price:base,change:0,preClose:base,drift:(Math.random()-0.48)*0.022,base};
     klineData[code]=[];
-    minuteData[code]=[base];
+    minuteData1[code]=[base];
+    minuteData5[code]=[base];
     for(let i=0;i<20;i++){
       const o=base*(1+(Math.random()-0.5)*0.015);
       const c=o*(1+(Math.random()-0.5)*0.012);
@@ -175,9 +186,11 @@ function stepSimulation(){
     const noise=(Math.random()-0.5)*0.006;
     q.price=Math.max(0.01,q.price*(1+q.drift+noise));
     q.change=((q.price/q.preClose)-1)*100;
-    minuteData[code].push(q.price);
-    if(minuteData[code].length>TOTAL_MINUTES)minuteData[code].shift();
+    minuteData1[code].push(q.price);
+    if(minuteData1[code].length>TOTAL_MINUTES)minuteData1[code].shift();
     if(simTime%5===0){
+      minuteData5[code].push(q.price);
+      if(minuteData5[code].length>48)minuteData5[code].shift();
       const last=klineData[code][klineData[code].length-1]||{c:q.price};
       const o=last.c, c=q.price;
       klineData[code].push({o,h:Math.max(o,c)*1.004,l:Math.min(o,c)*0.996,c});
@@ -198,15 +211,26 @@ function updateProgress(){
 
 async function updateAll(){
   if(mode!=='realtime')return;
+  realTick++;
   const secids=[...indices.map(i=>i.secid),...watchlist.map(w=>w.secid)];
   try{
     const res=await fetch(`https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&secids=${secids.join(",")}&fields=f2,f3,f12,f14,f18&_=${Date.now()}`);
     const data=await res.json();
     (data.data?.diff||[]).forEach(item=>{
-      quotes[item.f12]={name:item.f14,price:item.f2,change:item.f3,preClose:item.f18};
+      const code=item.f12;
+      quotes[code]={name:item.f14,price:item.f2,change:item.f3,preClose:item.f18};
+      if(!minuteData1[code])minuteData1[code]=[];
+      if(!minuteData5[code])minuteData5[code]=[];
+      minuteData1[code].push(item.f2);
+      if(minuteData1[code].length>120)minuteData1[code].shift();
+      if(realTick%5===0){
+        minuteData5[code].push(item.f2);
+        if(minuteData5[code].length>48)minuteData5[code].shift();
+      }
     });
   }catch(e){}
   renderAll();
+  drawCharts();
   document.getElementById("updateTime").textContent="实时 · "+new Date().toLocaleString();
 }
 
@@ -215,7 +239,7 @@ function updateChartSelect(){
   const cur=sel.value;
   sel.innerHTML='<option value="">选择图表</option>'+watchlist.map(w=>`<option value="${w.code}">${w.name} ${w.code}</option>`).join("");
   if(cur)sel.value=cur;
-  else if(watchlist.length>0 && mode==='offline') sel.value=watchlist[0].code;
+  else if(watchlist.length>0) sel.value=watchlist[0].code;
 }
 
 function drawCharts(){
@@ -248,12 +272,14 @@ function drawKline(code){
 function drawMinute(code){
   const box=document.getElementById("minuteBox");
   const canvas=document.getElementById("minuteCanvas");
-  if(!code||!minuteData[code]||minuteData[code].length<2){box.style.display="none";return;}
+  const type=document.getElementById("minuteType").value;
+  const data=type==='1' ? (minuteData1[code]||[]) : (minuteData5[code]||[]);
+  document.getElementById("minuteTitle").textContent=type==='1'?'1分钟分时图':'5分钟分时图';
+  if(!code||data.length<2){box.style.display="none";return;}
   box.style.display="block";
   const ctx=canvas.getContext("2d");
   const w=canvas.width=canvas.offsetWidth*2, h=canvas.height=280;
   ctx.clearRect(0,0,w,h);
-  const data=minuteData[code];
   const max=Math.max(...data), min=Math.min(...data);
   const range=max-min||1;
   ctx.beginPath();
@@ -327,10 +353,8 @@ function trade(code,side){
   pos.cost=total/Math.abs(pos.shares);
   if(pos.shares===0)delete positions[code];
   renderPositions();
-  if(mode==='offline'){
-    document.getElementById("chartSelect").value=code;
-    drawCharts();
-  }
+  document.getElementById("chartSelect").value=code;
+  drawCharts();
 }
 
 function closePosition(code){
@@ -368,7 +392,7 @@ function resetGame(){
 
 updateChartSelect();
 setMode('realtime');
-setInterval(()=>{if(mode==='realtime')updateAll();},6000);
+setInterval(()=>{if(mode==='realtime')updateAll();},5000);
 window.addEventListener('resize',drawCharts);
 </script>
 </body>
