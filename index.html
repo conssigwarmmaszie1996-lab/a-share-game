@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -167,8 +167,15 @@ function setMode(m){
   document.getElementById("btnRealtime").classList.toggle("active",m==='realtime');
   document.getElementById("btnOffline").classList.toggle("active",m==='offline');
   if(simInterval)clearInterval(simInterval);
-  if(m==='offline'){initSimulation();simInterval=setInterval(stepSimulation,1200);}
-  else updateAll();
+  if(m==='offline'){
+    initSimulation();
+    simInterval=setInterval(stepSimulation,1000);
+    // 自动选择第一只股票显示K线
+    if(watchlist.length>0){
+      document.getElementById("klineSelect").value=watchlist[0].code;
+      drawKline();
+    }
+  } else updateAll();
 }
 
 function initSimulation(){
@@ -189,7 +196,7 @@ function initSimulation(){
   });
   updateKlineSelect();
   renderAll();
-  document.getElementById("updateTime").textContent="离线模拟已开始";
+  document.getElementById("updateTime").textContent="离线模拟已开始 · K线实时更新";
 }
 
 function stepSimulation(){
@@ -210,7 +217,7 @@ function stepSimulation(){
   });
   renderAll();
   drawKline();
-  document.getElementById("updateTime").textContent=`离线模拟 · 第${simTime}分`;
+  document.getElementById("updateTime").textContent=`离线模拟 · 第${simTime}分 · K线实时更新中`;
 }
 
 async function updateAll(){
@@ -232,6 +239,7 @@ function updateKlineSelect(){
   const cur=sel.value;
   sel.innerHTML='<option value="">选择K线</option>'+watchlist.map(w=>`<option value="${w.code}">${w.name} ${w.code}</option>`).join("");
   if(cur)sel.value=cur;
+  else if(watchlist.length>0 && mode==='offline') sel.value=watchlist[0].code;
 }
 
 function drawKline(){
@@ -320,6 +328,11 @@ function trade(code,side){
   pos.cost=total/Math.abs(pos.shares);
   if(pos.shares===0)delete positions[code];
   renderPositions();
+  // 做空/做多后自动切换到该股票的K线
+  if(mode==='offline'){
+    document.getElementById("klineSelect").value=code;
+    drawKline();
+  }
 }
 
 function closePosition(code){
