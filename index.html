@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>模拟大A游戏</title>
 <style>
-  :root { --bg:#0c0a09; --card:#1c1614; --up:#ff4d4f; --down:#52c41a; --text:#d4c8b8; --muted:#8a7a6a; --accent:#8b7355; --short:#c47a4a; }
+  :root { --bg:#0c0a09; --card:#1c1614; --up:#ff4d4f; --down:#52c41a; --text:#d4c8b8; --muted:#8a7a6a; }
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Georgia,serif;background:var(--bg);color:var(--text);padding:16px;max-width:1100px;margin:0 auto}
   h1{font-size:22px;margin-bottom:6px;color:#e8dcc8}
@@ -14,8 +14,7 @@
   .mode-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
   .mode-bar button.active{background:#6b5a45}
   button{background:#6b5a45;border:1px solid #8b7355;color:#f0e6d8;padding:7px 12px;border-radius:4px;cursor:pointer}
-  button.short{background:#8a5a3a}
-  button.sell{background:#8a3a3a}
+  button.short{background:#8a5a3a} button.sell{background:#8a3a3a}
   .section{background:#1c1614;border:1px solid #3a2e28;border-radius:8px;padding:14px;margin-bottom:14px}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{padding:6px 4px;border-bottom:1px solid #2a221e;text-align:left}
@@ -27,7 +26,8 @@
   #progressSection{margin:8px 0}
   .progress-wrap{background:#2a221e;height:8px;border-radius:4px;overflow:hidden}
   .progress-bar{height:100%;background:#c9a87c;width:0%}
-  canvas{width:100%;height:140px;background:#12100e;border-radius:4px;margin-top:6px}
+  #chartBox{background:#12100e;border:1px solid #3a2e28;border-radius:8px;padding:10px;margin-bottom:14px}
+  canvas{width:100%;height:220px;display:block}
 </style>
 </head>
 <body>
@@ -39,15 +39,17 @@
     <button id="btnRealtime" class="active" onclick="setMode('realtime')">实时</button>
     <button id="btnOffline" onclick="setMode('offline')">离线模拟当日</button>
     <button onclick="resetGame()">重置</button>
+    <select id="chartSelect" onchange="drawChart()"><option value="">选择图表</option></select>
   </div>
   <div id="progressSection" style="display:none">
     <div class="progress-wrap"><div class="progress-bar" id="dayProgress"></div></div>
     <div style="font-size:12px;color:#8a7a6a;text-align:right" id="progressText">进度 0%</div>
   </div>
+  <div id="chartBox" style="display:none"><canvas id="chart"></canvas></div>
   <div class="indices" id="indices" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
   <div class="section">
     <h2>自选</h2>
-    <table id="watchlistTable">
+    <table>
       <thead><tr><th>名称</th><th>代码</th><th>现价</th><th>涨跌</th><th>操作</th></tr></thead>
       <tbody id="watchlist"></tbody>
     </table>
@@ -66,7 +68,6 @@
       <tbody id="positions"></tbody>
     </table>
   </div>
-  <div id="chartBox" style="display:none"><canvas id="chart"></canvas></div>
   <div style="font-size:12px;color:#8a7a6a;text-align:right;margin-top:8px" id="updateTime"></div>
 
 <script>
@@ -80,6 +81,7 @@ let watchlist = [
 ];
 let positions = {};
 let quotes = {};
+let priceHistory = {};
 let simTime = 0;
 let simTimer = null;
 
@@ -94,17 +96,19 @@ function setMode(m){
   if(simTimer) clearInterval(simTimer);
   if(m==='offline'){
     initOffline();
-    simTimer = setInterval(stepOffline, 1000);
-  } else {
-    updateRealtime();
-  }
+    simTimer = setInterval(stepOffline, 800);
+    if(watchlist[0]) document.getElementById('chartSelect').value = watchlist[0].code;
+    drawChart();
+  } else updateRealtime();
 }
 
 function initOffline(){
   simTime = 0;
   watchlist.forEach(w=>{
     quotes[w.code] = {name:w.name, price:w.base, change:0, pre:w.base};
+    priceHistory[w.code] = [w.base];
   });
+  updateChartSelect();
   renderAll();
   document.getElementById('updateTime').textContent = '离线模拟开始';
 }
@@ -114,11 +118,15 @@ function stepOffline(){
   simTime++;
   Object.keys(quotes).forEach(code=>{
     const q = quotes[code];
-    const chg = (Math.random()-0.5)*0.008;
+    const chg = (Math.random()-0.5)*0.009;
     q.price = Math.max(0.01, q.price*(1+chg));
     q.change = ((q.price/q.pre)-1)*100;
+    if(!priceHistory[code]) priceHistory[code]=[];
+    priceHistory[code].push(q.price);
+    if(priceHistory[code].length>200) priceHistory[code].shift();
   });
   renderAll();
+  drawChart();
   const pct = (simTime/240*100).toFixed(0);
   document.getElementById('dayProgress').style.width = pct+'%';
   document.getElementById('progressText').textContent = `进度 ${pct}% · ${simTime}分`;
@@ -133,21 +141,102 @@ async function updateRealtime(){
     const data = await res.json();
     (data.data?.diff||[]).forEach(i=>{
       quotes[i.f12] = {name:i.f14, price:i.f2, change:i.f3};
+      if(!priceHistory[i.f12]) priceHistory[i.f12]=[];
+      priceHistory[i.f12].push(i.f2);
+      if(priceHistory[i.f12].length>120) priceHistory[i.f12].shift();
     });
   }catch(e){}
   renderAll();
+  drawChart();
   document.getElementById('updateTime').textContent = '实时 '+new Date().toLocaleTimeString();
 }
 
+function updateChartSelect(){
+  const sel = document.getElementById('chartSelect');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">选择图表</option>' + watchlist.map(w=>`<option value="${w.code}">${w.name} ${w.code}</option>`).join('');
+  if(cur) sel.value = cur;
+  else if(watchlist[0]) sel.value = watchlist[0].code;
+}
+
+function drawChart(){
+  const code = document.getElementById('chartSelect').value;
+  const box = document.getElementById('chartBox');
+  const canvas = document.getElementById('chart');
+  const hist = priceHistory[code];
+  if(!code || !hist || hist.length<2){ box.style.display='none'; return; }
+  box.style.display='block';
+
+  const ctx = canvas.getContext('2d');
+  const dpr = 2;
+  const w = canvas.width = canvas.offsetWidth * dpr;
+  const h = canvas.height = 440;
+  ctx.clearRect(0,0,w,h);
+
+  // 网格
+  ctx.strokeStyle = '#2a2a2a';
+  ctx.lineWidth = 1;
+  for(let i=1;i<5;i++){
+    const y = h*0.1 + (h*0.7)*i/5;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+  }
+  for(let i=1;i<6;i++){
+    const x = w*i/6;
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h*0.8); ctx.stroke();
+  }
+
+  const prices = hist.slice(-120);
+  const max = Math.max(...prices);
+  const min = Math.min(...prices);
+  const range = max-min || 1;
+  const top = h*0.08, bot = h*0.78;
+
+  // 价格红线
+  ctx.beginPath();
+  prices.forEach((p,i)=>{
+    const x = (i/(prices.length-1))*w;
+    const y = bot - ((p-min)/range)*(bot-top);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle = '#ff4d4f';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // 黄色均线（简单移动平均）
+  const ma = [];
+  for(let i=0;i<prices.length;i++){
+    const start = Math.max(0,i-9);
+    const slice = prices.slice(start,i+1);
+    ma.push(slice.reduce((a,b)=>a+b,0)/slice.length);
+  }
+  ctx.beginPath();
+  ma.forEach((p,i)=>{
+    const x = (i/(ma.length-1))*w;
+    const y = bot - ((p-min)/range)*(bot-top);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle = '#f5c518';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // 成交量柱（模拟）
+  const volH = h*0.18;
+  for(let i=0;i<prices.length;i++){
+    const x = (i/(prices.length-1))*w;
+    const vol = 0.3 + Math.random()*0.7;
+    const vh = vol * volH;
+    ctx.fillStyle = prices[i] >= (prices[i-1]||prices[i]) ? '#ff4d4f66' : '#52c41a66';
+    ctx.fillRect(x-2, h-vh, 4, vh);
+  }
+}
+
 function renderAll(){
-  // 指数简化显示
   document.getElementById('indices').innerHTML = watchlist.slice(0,4).map(w=>{
     const q = quotes[w.code]||{};
     const ch = q.change||0;
     return `<div style="background:#1c1614;padding:8px;border-radius:6px;text-align:center"><div style="font-size:12px;color:#8a7a6a">${w.name}</div><div class="${color(ch)}">${fmt(q.price||0)}</div><div class="${color(ch)}">${ch>0?'+':''}${ch.toFixed(2)}%</div></div>`;
   }).join('');
 
-  // 自选
   document.getElementById('watchlist').innerHTML = watchlist.map(w=>{
     const q = quotes[w.code]||{};
     const ch = q.change||0;
@@ -162,7 +251,6 @@ function renderAll(){
     </tr>`;
   }).join('');
 
-  // 持仓
   let mv=0, pnl=0;
   const rows = Object.entries(positions).map(([code, p])=>{
     const q = quotes[code]||{};
@@ -197,23 +285,14 @@ function renderAll(){
 
 function openPos(code, side){
   const q = quotes[code];
-  if(!q || !q.price){
-    alert('暂无行情，请先切到离线模拟或等待实时数据');
-    return;
-  }
+  if(!q || !q.price){ alert('暂无行情，请先切到离线模拟'); return; }
   const price = q.price;
   const qtyStr = prompt(`做${side==='long'?'多':'空'} ${q.name}（${code}）\n现价：${fmt(price)}\n输入股数（100整数倍）：`, '100');
   if(!qtyStr) return;
   const qty = parseInt(qtyStr);
-  if(isNaN(qty) || qty<=0 || qty%100!==0){
-    alert('请输入100的整数倍');
-    return;
-  }
+  if(isNaN(qty) || qty<=0 || qty%100!==0){ alert('请输入100的整数倍'); return; }
   const amount = price * qty;
-  if(amount > cash){
-    alert('资金不足');
-    return;
-  }
+  if(amount > cash){ alert('资金不足'); return; }
   cash -= amount;
   if(!positions[code]) positions[code] = {shares:0, cost:0, name:q.name};
   const pos = positions[code];
@@ -224,7 +303,9 @@ function openPos(code, side){
   pos.cost = newAbs>0 ? totalCost / newAbs : 0;
   if(pos.shares===0) delete positions[code];
   renderAll();
-  alert(`开仓成功！${side==='long'?'多':' 空'} ${qty}股，占用资金 ${fmt(amount)}`);
+  document.getElementById('chartSelect').value = code;
+  drawChart();
+  alert(`开仓成功！${side==='long'?'多':'空'} ${qty}股`);
 }
 
 function closePos(code){
@@ -232,11 +313,9 @@ function closePos(code){
   if(!pos) return;
   const q = quotes[code];
   if(!q || !q.price){ alert('暂无行情'); return; }
-  const abs = Math.abs(pos.shares);
-  cash += q.price * abs;
+  cash += q.price * Math.abs(pos.shares);
   delete positions[code];
   renderAll();
-  alert('平仓成功');
 }
 
 function resetGame(){
@@ -247,8 +326,10 @@ function resetGame(){
   if(mode==='offline') initOffline();
 }
 
+updateChartSelect();
 setMode('realtime');
 setInterval(()=>{ if(mode==='realtime') updateRealtime(); }, 6000);
+window.addEventListener('resize', drawChart);
 </script>
 </body>
 </html>
