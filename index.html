@@ -15,7 +15,7 @@
   .mode-bar button.active{background:#6b5a45}
   button{background:#6b5a45;border:1px solid #8b7355;color:#f0e6d8;padding:7px 12px;border-radius:4px;cursor:pointer}
   button.short{background:#8a5a3a} button.sell{background:#8a3a3a}
-  select{background:#2a221e;border:1px solid #4a3c34;color:var(--text);padding:6px 10px;border-radius:4px}
+  input,select{background:#2a221e;border:1px solid #4a3c34;color:var(--text);padding:6px 10px;border-radius:4px}
   .section{background:#1c1614;border:1px solid #3a2e28;border-radius:8px;padding:14px;margin-bottom:14px}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{padding:6px 4px;border-bottom:1px solid #2a221e;text-align:left}
@@ -24,11 +24,13 @@
   .summary-item .label{font-size:12px;color:#8a7a6a}
   .summary-item .value{font-size:15px;font-weight:bold;margin-top:2px}
   .up{color:#ff4d4f}.down{color:#52c41a}
-  #progressSection{margin:8px 0; user-select:none; -webkit-user-select:none}
-  .progress-wrap{background:#2a221e;height:10px;border-radius:5px;overflow:hidden;pointer-events:none !important; cursor:default}
-  .progress-bar{height:100%;background:#c9a87c;width:0%;pointer-events:none !important; transition:width .3s}
+  #progressSection{margin:8px 0; user-select:none}
+  .progress-wrap{background:#2a221e;height:10px;border-radius:5px;overflow:hidden;pointer-events:none}
+  .progress-bar{height:100%;background:#c9a87c;width:0%;pointer-events:none}
   #chartBox{background:#12100e;border:1px solid #3a2e28;border-radius:8px;padding:10px;margin-bottom:14px}
   canvas{width:100%;height:240px;display:block}
+  .add-bar{display:flex;gap:8px;margin-bottom:10px}
+  .add-bar input{flex:1}
 </style>
 </head>
 <body>
@@ -50,6 +52,10 @@
   <div class="indices" id="indices" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
   <div class="section">
     <h2>自选</h2>
+    <div class="add-bar">
+      <input id="codeInput" placeholder="输入股票代码如 600519 或 000001" />
+      <button onclick="addStock()">添加</button>
+    </div>
     <table>
       <thead><tr><th>名称</th><th>代码</th><th>现价</th><th>涨跌</th><th>操作</th></tr></thead>
       <tbody id="watchlist"></tbody>
@@ -190,21 +196,26 @@ function drawChart(){
   }
 
   let prices = hist;
+  let drawWidth = w;
   if(mode==='offline'){
-    const showCount = Math.max(2, Math.floor((simTime/240)*hist.length));
-    prices = hist.slice(0, showCount);
+    const progress = simTime / 240;
+    drawWidth = w * progress;          // 按进度占比画线，收盘才满屏
+    prices = hist;                     // 数据随进度增长
   } else {
     prices = hist.slice(-120);
   }
+
+  if(prices.length<2) return;
 
   const max = Math.max(...prices);
   const min = Math.min(...prices);
   const range = max-min || 1;
   const top = h*0.08, bot = h*0.78;
 
+  // 价格红线（按进度宽度）
   ctx.beginPath();
   prices.forEach((p,i)=>{
-    const x = (i/(prices.length-1))*w;
+    const x = (i/(prices.length-1)) * drawWidth;
     const y = bot - ((p-min)/range)*(bot-top);
     if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
   });
@@ -212,6 +223,7 @@ function drawChart(){
   ctx.lineWidth = 2.5;
   ctx.stroke();
 
+  // 黄色均线
   const ma = [];
   for(let i=0;i<prices.length;i++){
     const start = Math.max(0,i-9);
@@ -220,7 +232,7 @@ function drawChart(){
   }
   ctx.beginPath();
   ma.forEach((p,i)=>{
-    const x = (i/(ma.length-1))*w;
+    const x = (i/(ma.length-1)) * drawWidth;
     const y = bot - ((p-min)/range)*(bot-top);
     if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
   });
@@ -228,9 +240,10 @@ function drawChart(){
   ctx.lineWidth = 2;
   ctx.stroke();
 
+  // 成交量
   const volH = h*0.18;
   for(let i=1;i<prices.length;i++){
-    const x = (i/(prices.length-1))*w;
+    const x = (i/(prices.length-1)) * drawWidth;
     const vol = 0.25 + Math.random()*0.75;
     const vh = vol * volH;
     ctx.fillStyle = prices[i] >= prices[i-1] ? '#ff4d4f88' : '#52c41a88';
@@ -324,6 +337,21 @@ function closePos(code){
   cash += q.price * Math.abs(pos.shares);
   delete positions[code];
   renderAll();
+}
+
+function addStock(){
+  const code = document.getElementById('codeInput').value.trim();
+  if(!code) return alert('请输入股票代码');
+  if(watchlist.find(w=>w.code===code)) return alert('已存在');
+  const base = 10 + Math.random()*100;
+  watchlist.push({code, name:code, base});
+  quotes[code] = {name:code, price:base, change:0, pre:base};
+  priceHistory[code] = [base];
+  document.getElementById('codeInput').value = '';
+  updateChartSelect();
+  renderAll();
+  if(mode==='offline') drawChart();
+  alert('已添加 '+code);
 }
 
 function resetGame(){
