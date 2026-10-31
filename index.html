@@ -176,6 +176,7 @@ let watchlist = [
 let positions = {};
 let quotes = {};
 let priceHistory = {};
+let fullHistory = {}; // 存储真实分时数据
 let trades = [];
 let simTime = 0;
 let simTimer = null;
@@ -184,6 +185,7 @@ let realizedPnl = 0;
 let achievements = JSON.parse(localStorage.getItem('aShareAch') || '{}');
 let challenge = null;
 let replayData = null;
+let simDate = '';
 window.currentScores = [];
 
 function playSound(type){
@@ -306,7 +308,8 @@ function startChallenge(){
 }
 
 function showNews(){
-  if(mode!=='offline' || Math.random()>0.15) return;
+  // 真实走势下减少随机消息，或可选
+  if(mode!=='offline' || Math.random()>0.08) return;
   const goods = ['重大利好！业绩超预期','政策支持，板块拉升','机构大举买入'];
   const bads = ['突发利空，业绩下滑','监管风险提示','大宗减持'];
   const isGood = Math.random()>0.5;
@@ -317,11 +320,6 @@ function showNews(){
   const box = document.getElementById('newsBox');
   box.prepend(div);
   setTimeout(()=>div.remove(), 8000);
-  Object.keys(quotes).forEach(code=>{
-    const q = quotes[code];
-    const impact = (isGood?1:-1) * (0.01+Math.random()*0.02);
-    q.price = Math.max(0.01, q.price*(1+impact));
-  });
   playSound(isGood?'win':'sell');
 }
 
@@ -333,30 +331,69 @@ function setMode(m){
   if(simTimer) clearInterval(simTimer);
   if(m==='offline'){
     initOffline();
-    simTimer = setInterval(stepOffline, 800);
   } else updateRealtime();
 }
 
-function initOffline(){
+async function fetchPrevDayData(code){
+  const secid = (code.startsWith('6')?'1.':'0.')+code;
+  // 取最近的交易日分时（大概是上一个交易日）
+  const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&klt=1&fqt=1&lmt=240&end=20500101&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61`;
+  try{
+    const res = await fetch(url);
+    const data = await res.json();
+    const klines = data.data?.klines || [];
+    if(klines.length===0) return null;
+    const prices = klines.map(k => parseFloat(k.split(',')[2])); // 收盘价
+    const date = klines[0].split(',')[0].slice(0,10);
+    return {prices, date, open: parseFloat(klines[0].split(',')[1])};
+  }catch(e){
+    console.error('fetch fail', code, e);
+    return null;
+  }
+}
+
+async function initOffline(){
   simTime = 0;
   trades = [];
   realizedPnl = 0;
   replayData = [];
-  watchlist.forEach(w=>{
-    quotes[w.code] = {name:w.name, price:w.base, change:0, pre:w.base};
-    priceHistory[w.code] = [w.base];
-  });
+  fullHistory = {};
+  document.getElementById('updateTime').textContent = '正在加载上一交易日真实走势...';
+  
+  let loaded = 0;
+  for(const w of watchlist){
+    const hist = await fetchPrevDayData(w.code);
+    if(hist && hist.prices.length>10){
+      fullHistory[w.code] = hist.prices;
+      quotes[w.code] = {name:w.name, price:hist.prices[0], change:0, pre:hist.open};
+      priceHistory[w.code] = [hist.prices[0]];
+      if(!simDate) simDate = hist.date;
+      loaded++;
+    } else {
+      // 降级到随机走势
+      quotes[w.code] = {name:w.name, price:w.base, change:0, pre:w.base};
+      priceHistory[w.code] = [w.base];
+      fullHistory[w.code] = null;
+    }
+  }
+  
+  if(loaded===0){
+    alert('无法加载真实分时，改用随机模拟');
+  }
+  
   updateChartSelect();
   document.getElementById('chartSelect').value = watchlist[0].code;
   renderAll();
   drawChart();
-  document.getElementById('updateTime').textContent = '离线模拟开始';
+  document.getElementById('updateTime').textContent = `离线模拟 · 上一交易日 ${simDate||'随机'}`;
+  
+  simTimer = setInterval(stepOffline, 800);
 }
 
 function stepOffline(){
   if(simTime>=240){
     clearInterval(simTimer);
-    document.getElementById('updateTime').textContent='收盘';
+    document.getElementById('updateTime').textContent='收盘 · '+ (simDate||'');
     const totalPnl = realizedPnl + getFloatingPnl();
     replayData = {prices:JSON.parse(JSON.stringify(priceHistory)), trades:[...trades]};
     setTimeout(()=> askSubmitToLeaderboard(totalPnl), 300);
@@ -364,20 +401,28 @@ function stepOffline(){
   }
   simTime++;
   showNews();
+  
   Object.keys(quotes).forEach(code=>{
     const q = quotes[code];
-    const chg = (Math.random()-0.5)*0.009;
-    q.price = Math.max(0.01, q.price*(1+chg));
-    q.change = ((q.price/q.pre)-1)*100;
+    const full = fullHistory[code];
+    if(full && full.length > simTime){
+      q.price = full[simTime];
+    } else {
+      // 随机降级
+      const chg = (Math.random()-0.5)*0.009;
+      q.price = Math.max(0.01, q.price*(1+chg));
+    }
+    q.change = ((q.price / (q.pre||q.price)) - 1)*100;
     if(!priceHistory[code]) priceHistory[code]=[];
     priceHistory[code].push(q.price);
   });
+  
   renderAll();
   drawChart();
   const pct = (simTime/240*100).toFixed(0);
   document.getElementById('dayProgress').style.width = pct+'%';
   document.getElementById('progressText').textContent = `进度 ${pct}% · ${simTime}分`;
-  document.getElementById('updateTime').textContent = `离线 ${simTime}/240 分`;
+  document.getElementById('updateTime').textContent = `离线 ${simTime}/240 分 · ${simDate||''}`;
 }
 
 function getFloatingPnl(){
