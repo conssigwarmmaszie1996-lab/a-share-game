@@ -5,410 +5,250 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>模拟大A游戏</title>
 <style>
-  :root {
-    --bg: #0c0a09; --card: #1c1614; --up: #ff4d4f; --down: #52c41a;
-    --text: #d4c8b8; --muted: #8a7a6a; --accent: #8b7355; --short: #c47a4a; --border: #2a221e;
-  }
+  :root { --bg:#0c0a09; --card:#1c1614; --up:#ff4d4f; --down:#52c41a; --text:#d4c8b8; --muted:#8a7a6a; --accent:#8b7355; --short:#c47a4a; }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:"Georgia","Times New Roman",serif;background:var(--bg);color:var(--text);padding:16px;max-width:1200px;margin:0 auto;background-image:radial-gradient(ellipse at top,#1a1410 0%,#0c0a09 70%)}
-  h1{font-size:24px;margin-bottom:4px;color:#e8dcc8;font-weight:normal;letter-spacing:1px}
-  .subtitle{color:var(--muted);font-size:13px;margin-bottom:12px;font-style:italic}
-  .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;border-bottom:1px solid var(--border);padding-bottom:12px}
+  body{font-family:Georgia,serif;background:var(--bg);color:var(--text);padding:16px;max-width:1100px;margin:0 auto}
+  h1{font-size:22px;margin-bottom:6px;color:#e8dcc8}
+  .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap}
   .cash{font-size:18px;color:#c9a87c;font-weight:bold}
-  .mode-bar{display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
-  .mode-bar button.active{background:#6b5a45;color:#f0e6d8}
-  .progress-wrap{margin:8px 0 16px;background:#2a221e;border-radius:4px;height:8px;overflow:hidden}
-  .progress-bar{height:100%;background:linear-gradient(90deg,#8b7355,#c9a87c);width:0%;transition:width .3s}
-  .progress-text{font-size:12px;color:var(--muted);text-align:right;margin-top:2px}
-  .indices{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
-  .index-card{background:linear-gradient(180deg,#241c18 0%,#1c1614 100%);border:1px solid #3a2e28;border-radius:6px;padding:10px;text-align:center;box-shadow:inset 0 1px 0 rgba(255,220,180,.05)}
-  .index-name{font-size:12px;color:var(--muted)}
-  .index-price{font-size:20px;font-weight:bold;margin:2px 0}
-  .index-change{font-size:12px}
-  .up{color:var(--up)}.down{color:var(--down)}
-  .section{background:linear-gradient(180deg,#1f1916 0%,#1c1614 100%);border:1px solid #3a2e28;border-radius:8px;padding:14px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,.4)}
-  .section h2{font-size:15px;margin-bottom:10px;color:#d4c4a8;font-weight:normal}
-  .search-bar{display:flex;gap:8px;margin-bottom:10px}
-  input,button,select{background:#2a221e;border:1px solid #4a3c34;color:var(--text);padding:7px 10px;border-radius:4px;font-size:13px;font-family:inherit}
-  input:focus,select:focus{outline:none;border-color:#8b7355}
-  input{flex:1;min-width:0}
-  button{background:linear-gradient(180deg,#6b5a45 0%,#5a4a38 100%);border:1px solid #8b7355;cursor:pointer;font-weight:500;color:#f0e6d8}
-  button:hover{filter:brightness(1.1)}
-  button.sell{background:linear-gradient(180deg,#8a3a3a 0%,#6a2a2a 100%);border-color:#aa5555}
-  button.short{background:linear-gradient(180deg,#8a5a3a 0%,#6a3a2a 100%);border-color:#c47a4a}
+  .mode-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .mode-bar button.active{background:#6b5a45}
+  button{background:#6b5a45;border:1px solid #8b7355;color:#f0e6d8;padding:7px 12px;border-radius:4px;cursor:pointer}
+  button.short{background:#8a5a3a}
+  button.sell{background:#8a3a3a}
+  .section{background:#1c1614;border:1px solid #3a2e28;border-radius:8px;padding:14px;margin-bottom:14px}
   table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{padding:7px 5px;text-align:left;border-bottom:1px solid #2a221e}
-  th{color:var(--muted);font-weight:500}
-  .actions button{padding:3px 7px;font-size:12px;margin-right:3px}
-  .update-time{font-size:12px;color:var(--muted);text-align:right;margin-top:6px;font-style:italic}
-  .portfolio-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px;font-size:14px}
-  .summary-item{background:#2a221e;padding:8px 10px;border-radius:6px;text-align:center}
-  .summary-item .label{font-size:12px;color:var(--muted)}
-  .summary-item .value{font-size:16px;font-weight:bold;margin-top:2px}
-  .error{color:#ff6b6b;font-size:12px;margin-top:6px}
-  .tag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:11px}
-  .tag.long{background:#52c41a33;color:#52c41a}.tag.short{background:#c47a4a33;color:#c47a4a}
-  #klineBox,#minuteBox{margin-top:12px;background:#12100e;border:1px solid #3a2e28;border-radius:6px;padding:8px}
-  canvas{width:100%;height:160px;display:block}
+  th,td{padding:6px 4px;border-bottom:1px solid #2a221e;text-align:left}
+  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px}
+  .summary-item{background:#2a221e;padding:8px;border-radius:6px;text-align:center}
+  .summary-item .label{font-size:12px;color:#8a7a6a}
+  .summary-item .value{font-size:15px;font-weight:bold;margin-top:2px}
+  .up{color:#ff4d4f}.down{color:#52c41a}
+  #progressSection{margin:8px 0}
+  .progress-wrap{background:#2a221e;height:8px;border-radius:4px;overflow:hidden}
+  .progress-bar{height:100%;background:#c9a87c;width:0%}
+  canvas{width:100%;height:140px;background:#12100e;border-radius:4px;margin-top:6px}
 </style>
 </head>
 <body>
   <div class="header">
-    <div>
-      <h1>模拟大A 游戏</h1>
-      <div class="subtitle">仓位·持股·盈亏实时变动 · 分时模拟</div>
-    </div>
-    <div class="cash">可用资金：<span id="cash">100,000.00</span> 元</div>
+    <h1>模拟大A 游戏</h1>
+    <div class="cash">可用资金：<span id="cash">100,000.00</span></div>
   </div>
-
   <div class="mode-bar">
-    <button id="btnRealtime" class="active" onclick="setMode('realtime')">实时行情</button>
-    <button id="btnOffline" onclick="setMode('offline')">模拟当日走势</button>
-    <button onclick="resetGame()">重置游戏</button>
-    <select id="chartSelect" onchange="drawCharts()"><option value="">选择图表</option></select>
-    <select id="minuteType" onchange="drawCharts()">
-      <option value="1">1分钟分时</option>
-      <option value="5">5分钟分时</option>
-    </select>
+    <button id="btnRealtime" class="active" onclick="setMode('realtime')">实时</button>
+    <button id="btnOffline" onclick="setMode('offline')">离线模拟当日</button>
+    <button onclick="resetGame()">重置</button>
   </div>
-
   <div id="progressSection" style="display:none">
     <div class="progress-wrap"><div class="progress-bar" id="dayProgress"></div></div>
-    <div class="progress-text" id="progressText">当日进度 0%</div>
+    <div style="font-size:12px;color:#8a7a6a;text-align:right" id="progressText">进度 0%</div>
   </div>
-
-  <div class="indices" id="indices"></div>
-  <div id="klineBox" style="display:none"><div style="font-size:12px;color:#8a7a6a;margin-bottom:4px">K线</div><canvas id="klineCanvas"></canvas></div>
-  <div id="minuteBox" style="display:none"><div style="font-size:12px;color:#8a7a6a;margin-bottom:4px" id="minuteTitle">分时图</div><canvas id="minuteCanvas"></canvas></div>
-
+  <div class="indices" id="indices" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
   <div class="section">
-    <h2>自选股票</h2>
-    <div class="search-bar">
-      <input id="codeInput" placeholder="输入代码如 600519" />
-      <button onclick="addStock()">添加</button>
-    </div>
-    <div id="error" class="error"></div>
-    <table>
-      <thead><tr><th>名称</th><th>代码</th><th>现价</th><th>涨跌幅</th><th>操作</th></tr></thead>
+    <h2>自选</h2>
+    <table id="watchlistTable">
+      <thead><tr><th>名称</th><th>代码</th><th>现价</th><th>涨跌</th><th>操作</th></tr></thead>
       <tbody id="watchlist"></tbody>
     </table>
   </div>
-
   <div class="section">
-    <h2>我的持仓（模拟金实时变动）</h2>
-    <div class="portfolio-summary">
-      <div class="summary-item"><div class="label">可用资金</div><div class="value" id="cash2">100,000.00</div></div>
-      <div class="summary-item"><div class="label">持仓市值</div><div class="value" id="marketValue">0.00</div></div>
-      <div class="summary-item"><div class="label">总资产</div><div class="value" id="totalAsset">100,000.00</div></div>
-      <div class="summary-item"><div class="label">浮动盈亏</div><div class="value" id="pnl">0.00</div></div>
-      <div class="summary-item"><div class="label">仓位比例</div><div class="value" id="positionRatio">0%</div></div>
-      <div class="summary-item"><div class="label">当日最高盈利</div><div class="value" id="maxPnl">0.00</div></div>
+    <h2>我的持仓</h2>
+    <div class="summary">
+      <div class="summary-item"><div class="label">可用资金</div><div class="value" id="sCash">100000</div></div>
+      <div class="summary-item"><div class="label">持仓市值</div><div class="value" id="sMv">0</div></div>
+      <div class="summary-item"><div class="label">总资产</div><div class="value" id="sTotal">100000</div></div>
+      <div class="summary-item"><div class="label">浮盈</div><div class="value" id="sPnl">0</div></div>
+      <div class="summary-item"><div class="label">仓位</div><div class="value" id="sRatio">0%</div></div>
     </div>
     <table>
-      <thead><tr><th>名称</th><th>代码</th><th>方向</th><th>持股数量</th><th>成本价</th><th>现价</th><th>盈亏</th><th>仓位%</th><th>操作</th></tr></thead>
+      <thead><tr><th>名称</th><th>代码</th><th>方向</th><th>数量</th><th>成本</th><th>现价</th><th>盈亏</th><th>操作</th></tr></thead>
       <tbody id="positions"></tbody>
     </table>
   </div>
-  <div class="update-time" id="updateTime">加载中...</div>
+  <div id="chartBox" style="display:none"><canvas id="chart"></canvas></div>
+  <div style="font-size:12px;color:#8a7a6a;text-align:right;margin-top:8px" id="updateTime"></div>
 
 <script>
-const INITIAL_CASH = 100000;
-const TOTAL_MINUTES = 240;
-let cash = INITIAL_CASH;
+let cash = 100000;
 let mode = 'realtime';
 let watchlist = [
-  { code: "600519", name: "贵州茅台", secid: "1.600519", base: 1680 },
-  { code: "000858", name: "五粮液", secid: "0.000858", base: 145 },
-  { code: "300750", name: "宁德时代", secid: "0.300750", base: 210 },
-  { code: "000001", name: "平安银行", secid: "0.000001", base: 11.5 }
+  {code:'600519', name:'贵州茅台', base:1680},
+  {code:'000858', name:'五粮液', base:145},
+  {code:'300750', name:'宁德时代', base:210},
+  {code:'000001', name:'平安银行', base:11.5}
 ];
 let positions = {};
 let quotes = {};
-let klineData = {};
-let minuteData1 = {};
-let minuteData5 = {};
 let simTime = 0;
-let simInterval = null;
-let realTick = 0;
-let maxPnlToday = 0;
+let simTimer = null;
 
-const indices = [
-  { name: "上证指数", secid: "1.000001", base: 3200 },
-  { name: "深证成指", secid: "0.399001", base: 10200 },
-  { name: "创业板指", secid: "0.399006", base: 2100 },
-  { name: "科创50", secid: "1.000688", base: 980 }
-];
-
-function formatNum(n,d=2){return Number(n).toLocaleString("zh-CN",{minimumFractionDigits:d,maximumFractionDigits:d})}
-function getColor(v){return v>0?"up":v<0?"down":""}
+function fmt(n){ return Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function color(v){ return v>0?'up':v<0?'down':''; }
 
 function setMode(m){
-  mode=m;
-  document.getElementById("btnRealtime").classList.toggle("active",m==='realtime');
-  document.getElementById("btnOffline").classList.toggle("active",m==='offline');
-  document.getElementById("progressSection").style.display = m==='offline' ? 'block' : 'none';
-  if(simInterval)clearInterval(simInterval);
+  mode = m;
+  document.getElementById('btnRealtime').classList.toggle('active', m==='realtime');
+  document.getElementById('btnOffline').classList.toggle('active', m==='offline');
+  document.getElementById('progressSection').style.display = m==='offline'?'block':'none';
+  if(simTimer) clearInterval(simTimer);
   if(m==='offline'){
-    initSimulation();
-    simInterval=setInterval(stepSimulation,800);
-    if(watchlist.length>0){
-      document.getElementById("chartSelect").value=watchlist[0].code;
-      drawCharts();
-    }
+    initOffline();
+    simTimer = setInterval(stepOffline, 1000);
   } else {
-    realTick=0;
-    Object.keys(quotes).forEach(c=>{minuteData1[c]=[];minuteData5[c]=[];});
-    updateAll();
+    updateRealtime();
   }
 }
 
-function initSimulation(){
-  simTime=0;
-  maxPnlToday=0;
-  const all=[...indices,...watchlist];
-  all.forEach(item=>{
-    const code=item.code||item.secid.split(".")[1];
-    const base=item.base||100;
-    quotes[code]={name:item.name,price:base,change:0,preClose:base,drift:(Math.random()-0.48)*0.022,base};
-    klineData[code]=[];
-    minuteData1[code]=[base];
-    minuteData5[code]=[base];
-    for(let i=0;i<20;i++){
-      const o=base*(1+(Math.random()-0.5)*0.015);
-      const c=o*(1+(Math.random()-0.5)*0.012);
-      klineData[code].push({o,h:Math.max(o,c)*1.005,l:Math.min(o,c)*0.995,c});
-    }
+function initOffline(){
+  simTime = 0;
+  watchlist.forEach(w=>{
+    quotes[w.code] = {name:w.name, price:w.base, change:0, pre:w.base};
   });
-  updateChartSelect();
   renderAll();
-  updateProgress();
-  document.getElementById("updateTime").textContent="离线模拟已开始 · 资金将随行情变动";
+  document.getElementById('updateTime').textContent = '离线模拟开始';
 }
 
-function stepSimulation(){
-  if(simTime>=TOTAL_MINUTES){clearInterval(simInterval);document.getElementById("updateTime").textContent="当日收盘";return;}
+function stepOffline(){
+  if(simTime>=240){ clearInterval(simTimer); document.getElementById('updateTime').textContent='收盘'; return; }
   simTime++;
   Object.keys(quotes).forEach(code=>{
-    const q=quotes[code];
-    const noise=(Math.random()-0.5)*0.006;
-    q.price=Math.max(0.01,q.price*(1+q.drift+noise));
-    q.change=((q.price/q.preClose)-1)*100;
-    minuteData1[code].push(q.price);
-    if(minuteData1[code].length>TOTAL_MINUTES)minuteData1[code].shift();
-    if(simTime%5===0){
-      minuteData5[code].push(q.price);
-      if(minuteData5[code].length>48)minuteData5[code].shift();
-      const last=klineData[code][klineData[code].length-1]||{c:q.price};
-      const o=last.c, c=q.price;
-      klineData[code].push({o,h:Math.max(o,c)*1.004,l:Math.min(o,c)*0.996,c});
-      if(klineData[code].length>50)klineData[code].shift();
-    }
+    const q = quotes[code];
+    const chg = (Math.random()-0.5)*0.008;
+    q.price = Math.max(0.01, q.price*(1+chg));
+    q.change = ((q.price/q.pre)-1)*100;
   });
   renderAll();
-  drawCharts();
-  updateProgress();
-  document.getElementById("updateTime").textContent=`离线 · ${simTime}/${TOTAL_MINUTES} 分 · 资金实时变动中`;
+  const pct = (simTime/240*100).toFixed(0);
+  document.getElementById('dayProgress').style.width = pct+'%';
+  document.getElementById('progressText').textContent = `进度 ${pct}% · ${simTime}分`;
+  document.getElementById('updateTime').textContent = `离线 ${simTime}/240 分`;
 }
 
-function updateProgress(){
-  const pct=Math.min(100,(simTime/TOTAL_MINUTES)*100);
-  document.getElementById("dayProgress").style.width=pct+"%";
-  document.getElementById("progressText").textContent=`当日进度 ${pct.toFixed(0)}% · ${simTime}分钟`;
-}
-
-async function updateAll(){
-  if(mode!=='realtime')return;
-  realTick++;
-  const secids=[...indices.map(i=>i.secid),...watchlist.map(w=>w.secid)];
+async function updateRealtime(){
+  if(mode!=='realtime') return;
   try{
-    const res=await fetch(`https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&secids=${secids.join(",")}&fields=f2,f3,f12,f14,f18&_=${Date.now()}`);
-    const data=await res.json();
-    (data.data?.diff||[]).forEach(item=>{
-      const code=item.f12;
-      quotes[code]={name:item.f14,price:item.f2,change:item.f3,preClose:item.f18};
-      if(!minuteData1[code])minuteData1[code]=[];
-      if(!minuteData5[code])minuteData5[code]=[];
-      minuteData1[code].push(item.f2);
-      if(minuteData1[code].length>120)minuteData1[code].shift();
-      if(realTick%5===0){
-        minuteData5[code].push(item.f2);
-        if(minuteData5[code].length>48)minuteData5[code].shift();
-      }
+    const codes = watchlist.map(w=> (w.code.startsWith('6')?'1.':'0.')+w.code).join(',');
+    const res = await fetch(`https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&secids=${codes}&fields=f2,f3,f12,f14&_=${Date.now()}`);
+    const data = await res.json();
+    (data.data?.diff||[]).forEach(i=>{
+      quotes[i.f12] = {name:i.f14, price:i.f2, change:i.f3};
     });
   }catch(e){}
   renderAll();
-  drawCharts();
-  document.getElementById("updateTime").textContent="实时 · "+new Date().toLocaleString();
+  document.getElementById('updateTime').textContent = '实时 '+new Date().toLocaleTimeString();
 }
 
-function updateChartSelect(){
-  const sel=document.getElementById("chartSelect");
-  const cur=sel.value;
-  sel.innerHTML='<option value="">选择图表</option>'+watchlist.map(w=>`<option value="${w.code}">${w.name} ${w.code}</option>`).join("");
-  if(cur)sel.value=cur;
-  else if(watchlist.length>0) sel.value=watchlist[0].code;
+function renderAll(){
+  // 指数简化显示
+  document.getElementById('indices').innerHTML = watchlist.slice(0,4).map(w=>{
+    const q = quotes[w.code]||{};
+    const ch = q.change||0;
+    return `<div style="background:#1c1614;padding:8px;border-radius:6px;text-align:center"><div style="font-size:12px;color:#8a7a6a">${w.name}</div><div class="${color(ch)}">${fmt(q.price||0)}</div><div class="${color(ch)}">${ch>0?'+':''}${ch.toFixed(2)}%</div></div>`;
+  }).join('');
+
+  // 自选
+  document.getElementById('watchlist').innerHTML = watchlist.map(w=>{
+    const q = quotes[w.code]||{};
+    const ch = q.change||0;
+    return `<tr>
+      <td>${w.name}</td><td>${w.code}</td>
+      <td class="${color(ch)}">${fmt(q.price||0)}</td>
+      <td class="${color(ch)}">${ch>0?'+':''}${ch.toFixed(2)}%</td>
+      <td>
+        <button onclick="openPos('${w.code}','long')">做多</button>
+        <button class="short" onclick="openPos('${w.code}','short')">做空</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // 持仓
+  let mv=0, pnl=0;
+  const rows = Object.entries(positions).map(([code, p])=>{
+    const q = quotes[code]||{};
+    const price = q.price || p.cost;
+    const isLong = p.shares>0;
+    const abs = Math.abs(p.shares);
+    const value = price * abs;
+    const profit = isLong ? (price-p.cost)*abs : (p.cost-price)*abs;
+    mv += isLong ? value : -value;
+    pnl += profit;
+    return `<tr>
+      <td>${p.name}</td><td>${code}</td>
+      <td>${isLong?'多':'空'}</td><td>${abs}</td>
+      <td>${fmt(p.cost)}</td>
+      <td class="${color(isLong?price-p.cost:p.cost-price)}">${fmt(price)}</td>
+      <td class="${color(profit)}">${profit>0?'+':''}${fmt(profit)}</td>
+      <td><button class="sell" onclick="closePos('${code}')">平仓</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('positions').innerHTML = rows || '<tr><td colspan="8" style="text-align:center;color:#8a7a6a">暂无持仓</td></tr>';
+
+  const total = cash + mv;
+  document.getElementById('sCash').textContent = fmt(cash);
+  document.getElementById('sMv').textContent = fmt(mv);
+  document.getElementById('sTotal').textContent = fmt(total);
+  document.getElementById('sPnl').textContent = (pnl>0?'+':'')+fmt(pnl);
+  document.getElementById('sPnl').className = 'value '+color(pnl);
+  document.getElementById('cash').textContent = fmt(cash);
+  const used = Object.values(positions).reduce((s,p)=>s+Math.abs(p.shares)*(quotes[Object.keys(positions).find(k=>positions[k]===p)]?.price||p.cost),0);
+  document.getElementById('sRatio').textContent = ((used/(cash+Math.abs(mv)||1))*100).toFixed(1)+'%';
 }
 
-function drawCharts(){
-  const code=document.getElementById("chartSelect").value;
-  drawKline(code);
-  drawMinute(code);
-}
-
-function drawKline(code){
-  const box=document.getElementById("klineBox");
-  const canvas=document.getElementById("klineCanvas");
-  if(!code||!klineData[code]||klineData[code].length<2){box.style.display="none";return;}
-  box.style.display="block";
-  const ctx=canvas.getContext("2d");
-  const w=canvas.width=canvas.offsetWidth*2, h=canvas.height=320;
-  ctx.clearRect(0,0,w,h);
-  const data=klineData[code].slice(-40);
-  const max=Math.max(...data.map(d=>d.h)), min=Math.min(...data.map(d=>d.l));
-  const range=max-min||1, cw=w/data.length;
-  data.forEach((d,i)=>{
-    const x=i*cw+cw/2;
-    const yo=(d.o-min)/range*h*0.8+h*0.1, yc=(d.c-min)/range*h*0.8+h*0.1;
-    const yh=(d.h-min)/range*h*0.8+h*0.1, yl=(d.l-min)/range*h*0.8+h*0.1;
-    const color=d.c>=d.o?"#ff4d4f":"#52c41a";
-    ctx.strokeStyle=color; ctx.beginPath(); ctx.moveTo(x,yh); ctx.lineTo(x,yl); ctx.stroke();
-    ctx.fillStyle=color; ctx.fillRect(x-cw*0.3,Math.min(yo,yc),cw*0.6,Math.abs(yc-yo)||1);
-  });
-}
-
-function drawMinute(code){
-  const box=document.getElementById("minuteBox");
-  const canvas=document.getElementById("minuteCanvas");
-  const type=document.getElementById("minuteType").value;
-  const data=type==='1' ? (minuteData1[code]||[]) : (minuteData5[code]||[]);
-  document.getElementById("minuteTitle").textContent=type==='1'?'1分钟分时图':'5分钟分时图';
-  if(!code||data.length<2){box.style.display="none";return;}
-  box.style.display="block";
-  const ctx=canvas.getContext("2d");
-  const w=canvas.width=canvas.offsetWidth*2, h=canvas.height=280;
-  ctx.clearRect(0,0,w,h);
-  const max=Math.max(...data), min=Math.min(...data);
-  const range=max-min||1;
-  ctx.beginPath();
-  data.forEach((p,i)=>{
-    const x=(i/(data.length-1))*w;
-    const y=h-((p-min)/range)*h*0.85-h*0.075;
-    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-  });
-  ctx.strokeStyle="#c9a87c"; ctx.lineWidth=2; ctx.stroke();
-}
-
-function renderAll(){renderIndices();renderWatchlist();renderPositions();}
-
-function renderIndices(){
-  document.getElementById("indices").innerHTML=indices.map(idx=>{
-    const code=idx.secid.split(".")[1];
-    const q=quotes[code]||{};
-    const chg=q.change||0;
-    return `<div class="index-card"><div class="index-name">${idx.name}</div><div class="index-price ${getColor(chg)}">${formatNum(q.price||0)}</div><div class="index-change ${getColor(chg)}">${chg>0?"+":""}${formatNum(chg)}%</div></div>`;
-  }).join("");
-}
-
-function renderWatchlist(){
-  document.getElementById("watchlist").innerHTML=watchlist.map(w=>{
-    const q=quotes[w.code]||{};
-    const chg=q.change||0;
-    return `<tr><td>${q.name||w.name}</td><td>${w.code}</td><td class="${getColor(chg)}">${formatNum(q.price||0)}</td><td class="${getColor(chg)}">${chg>0?"+":""}${formatNum(chg)}%</td><td class="actions"><button onclick="trade('${w.code}','buy')">做多</button><button class="short" onclick="trade('${w.code}','short')">做空</button></td></tr>`;
-  }).join("");
-}
-
-function renderPositions(){
-  let mv=0,pnl=0,totalUsed=0;
-  const totalAssetBase=cash;
-  const rows=Object.entries(positions).map(([code,pos])=>{
-    const q=quotes[code]||{};
-    const price=q.price||pos.cost;
-    const isLong=pos.shares>0;
-    const abs=Math.abs(pos.shares);
-    const value=price*abs;
-    const p=isLong?(price-pos.cost)*abs:(pos.cost-price)*abs;
-    mv+=isLong?value:-value;
-    pnl+=p;
-    totalUsed+=value;
-    const ratio=((value/(cash+Math.abs(mv)||1))*100).toFixed(1);
-    return `<tr><td>${pos.name}</td><td>${code}</td><td><span class="tag ${isLong?'long':'short'}">${isLong?'多':'空'}</span></td><td>${abs}</td><td>${formatNum(pos.cost)}</td><td class="${getColor(isLong?price-pos.cost:pos.cost-price)}">${formatNum(price)}</td><td class="${getColor(p)}">${p>0?"+":""}${formatNum(p)}</td><td>${ratio}%</td><td class="actions"><button class="sell" onclick="closePosition('${code}')">平仓</button></td></tr>`;
-  }).join("");
-  document.getElementById("positions").innerHTML=rows||"<tr><td colspan='9' style='text-align:center;color:#8a7a6a'>暂无持仓</td></tr>";
-
-  const totalAsset=cash+mv;
-  if(pnl>maxPnlToday) maxPnlToday=pnl;
-
-  document.getElementById("marketValue").textContent=formatNum(mv);
-  document.getElementById("totalAsset").textContent=formatNum(totalAsset);
-  document.getElementById("pnl").textContent=(pnl>0?"+":"")+formatNum(pnl);
-  document.getElementById("pnl").className=getColor(pnl);
-  document.getElementById("cash").textContent=formatNum(cash);
-  document.getElementById("cash2").textContent=formatNum(cash);
-  document.getElementById("positionRatio").textContent=((totalUsed/(cash+Math.abs(mv)||1))*100).toFixed(1)+"%";
-  document.getElementById("maxPnl").textContent=(maxPnlToday>0?"+":"")+formatNum(maxPnlToday);
-  document.getElementById("maxPnl").className=getColor(maxPnlToday);
-}
-
-function trade(code,side){
-  const q=quotes[code];
-  if(!q?.price)return alert("暂无行情");
-  const price=q.price;
-  const action=side==="buy"?"做多":"做空";
-  const shares=prompt(`${action} ${q.name}\n现价：${formatNum(price)}\n股数(100倍)：`,"100");
-  if(!shares||shares%100!==0||shares<=0)return alert("请输入100整数倍");
-  const qty=+shares;
-  const amount=price*qty;
-  if(amount>cash)return alert("资金不足");
-  cash-=amount;
-  if(!positions[code])positions[code]={shares:0,cost:0,name:q.name};
-  const pos=positions[code];
-  const total=pos.cost*Math.abs(pos.shares)+amount;
-  pos.shares+=side==="buy"?qty:-qty;
-  pos.cost=total/Math.abs(pos.shares);
-  if(pos.shares===0)delete positions[code];
-  renderPositions();
-  document.getElementById("chartSelect").value=code;
-  drawCharts();
-}
-
-function closePosition(code){
-  const pos=positions[code];
-  if(!pos)return;
-  const q=quotes[code];
-  if(!q?.price)return alert("暂无行情");
-  cash+=q.price*Math.abs(pos.shares);
-  delete positions[code];
-  renderPositions();
-}
-
-function addStock(){
-  const code=document.getElementById("codeInput").value.trim();
-  if(!code||watchlist.find(w=>w.code===code)){
-    document.getElementById("error").textContent=code?"已存在":"";
+function openPos(code, side){
+  const q = quotes[code];
+  if(!q || !q.price){
+    alert('暂无行情，请先切到离线模拟或等待实时数据');
     return;
   }
-  const secid=(code.startsWith("6")||code.startsWith("5"))?`1.${code}`:`0.${code}`;
-  watchlist.push({code,name:code,secid,base:20+Math.random()*80});
-  document.getElementById("codeInput").value="";
-  document.getElementById("error").textContent="";
-  updateChartSelect();
-  if(mode==='offline')initSimulation();
-  else updateAll();
+  const price = q.price;
+  const qtyStr = prompt(`做${side==='long'?'多':'空'} ${q.name}（${code}）\n现价：${fmt(price)}\n输入股数（100整数倍）：`, '100');
+  if(!qtyStr) return;
+  const qty = parseInt(qtyStr);
+  if(isNaN(qty) || qty<=0 || qty%100!==0){
+    alert('请输入100的整数倍');
+    return;
+  }
+  const amount = price * qty;
+  if(amount > cash){
+    alert('资金不足');
+    return;
+  }
+  cash -= amount;
+  if(!positions[code]) positions[code] = {shares:0, cost:0, name:q.name};
+  const pos = positions[code];
+  const oldAbs = Math.abs(pos.shares);
+  const totalCost = pos.cost * oldAbs + amount;
+  pos.shares += (side==='long' ? qty : -qty);
+  const newAbs = Math.abs(pos.shares);
+  pos.cost = newAbs>0 ? totalCost / newAbs : 0;
+  if(pos.shares===0) delete positions[code];
+  renderAll();
+  alert(`开仓成功！${side==='long'?'多':' 空'} ${qty}股，占用资金 ${fmt(amount)}`);
+}
+
+function closePos(code){
+  const pos = positions[code];
+  if(!pos) return;
+  const q = quotes[code];
+  if(!q || !q.price){ alert('暂无行情'); return; }
+  const abs = Math.abs(pos.shares);
+  cash += q.price * abs;
+  delete positions[code];
+  renderAll();
+  alert('平仓成功');
 }
 
 function resetGame(){
-  if(!confirm("重置资金和持仓？"))return;
-  cash=INITIAL_CASH;
-  positions={};
-  maxPnlToday=0;
-  renderPositions();
-  if(mode==='offline')initSimulation();
+  if(!confirm('重置资金和持仓？')) return;
+  cash = 100000;
+  positions = {};
+  renderAll();
+  if(mode==='offline') initOffline();
 }
 
-updateChartSelect();
 setMode('realtime');
-setInterval(()=>{if(mode==='realtime')updateAll();},5000);
-window.addEventListener('resize',drawCharts);
+setInterval(()=>{ if(mode==='realtime') updateRealtime(); }, 6000);
 </script>
 </body>
 </html>
