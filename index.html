@@ -91,7 +91,7 @@
       <div class="leaderboard">
         <h3>当日盈利排行榜</h3>
         <div id="leaderboardList"></div>
-        <div style="font-size:11px;color:#8a7a6a;margin-top:8px;text-align:center">免注册 · 数据自动保存</div>
+        <div style="font-size:11px;color:#8a7a6a;margin-top:8px;text-align:center">免注册 · 收盘后可选择上榜</div>
       </div>
     </div>
   </div>
@@ -114,7 +114,7 @@ let myName = localStorage.getItem('aShareName') || generateName();
 let myTodayPnl = 0;
 
 function generateName(){
-  const prefixes = ['散户','游资','短线','长线','量化','价值','技术','游资','波段','趋势'];
+  const prefixes = ['散户','游资','短线','长线','量化','价值','技术','波段','趋势'];
   const suffixes = ['小王','阿强','老李','小张','阿明','小刘','老周','阿林','小陈','老吴'];
   const name = prefixes[Math.floor(Math.random()*prefixes.length)] + suffixes[Math.floor(Math.random()*suffixes.length)] + Math.floor(Math.random()*100);
   localStorage.setItem('aShareName', name);
@@ -134,7 +134,7 @@ function loadLeaderboard(){
   return lb;
 }
 
-function saveMyPnl(pnl){
+function saveMyPnl(pnl, force=false){
   myTodayPnl = pnl;
   let lb = loadLeaderboard();
   const idx = lb.findIndex(x=>x.name===myName);
@@ -143,6 +143,21 @@ function saveMyPnl(pnl){
   lb.sort((a,b)=>b.pnl-a.pnl);
   localStorage.setItem('aShareLB', JSON.stringify(lb.slice(0,20)));
   renderLeaderboard();
+}
+
+function askSubmitToLeaderboard(pnl){
+  const msg = `今日模拟结束\n您的盈利：${pnl>=0?'+':''}${fmt(pnl)}\n\n是否留名上榜？（当前昵称：${myName}）`;
+  if(confirm(msg)){
+    const newName = prompt('留名昵称（可修改）：', myName);
+    if(newName && newName.trim()){
+      myName = newName.trim();
+      localStorage.setItem('aShareName', myName);
+    }
+    saveMyPnl(pnl);
+    alert('已上榜！');
+  } else {
+    alert('已取消上榜');
+  }
 }
 
 function renderLeaderboard(){
@@ -186,7 +201,13 @@ function initOffline(){
 }
 
 function stepOffline(){
-  if(simTime>=240){ clearInterval(simTimer); document.getElementById('updateTime').textContent='收盘'; saveMyPnl(getCurrentPnl()); return; }
+  if(simTime>=240){
+    clearInterval(simTimer);
+    document.getElementById('updateTime').textContent='收盘';
+    const finalPnl = getCurrentPnl();
+    setTimeout(()=> askSubmitToLeaderboard(finalPnl), 300);
+    return;
+  }
   simTime++;
   Object.keys(quotes).forEach(code=>{
     const q = quotes[code];
@@ -202,7 +223,6 @@ function stepOffline(){
   document.getElementById('dayProgress').style.width = pct+'%';
   document.getElementById('progressText').textContent = `进度 ${pct}% · ${simTime}分`;
   document.getElementById('updateTime').textContent = `离线 ${simTime}/240 分`;
-  if(simTime % 10 === 0) saveMyPnl(getCurrentPnl());
 }
 
 function getCurrentPnl(){
@@ -399,7 +419,6 @@ function openPos(code, side){
   renderAll();
   document.getElementById('chartSelect').value = code;
   drawChart();
-  saveMyPnl(getCurrentPnl());
   alert(`开仓成功！${side==='long'?'多':'空'} ${qty}股`);
 }
 
@@ -411,7 +430,6 @@ function closePos(code){
   cash += q.price * Math.abs(pos.shares);
   delete positions[code];
   renderAll();
-  saveMyPnl(getCurrentPnl());
 }
 
 function addStock(){
