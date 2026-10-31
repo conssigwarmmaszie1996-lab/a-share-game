@@ -58,6 +58,17 @@
   #playlist{font-size:13px;color:#d4c4a8;max-height:80px;overflow-y:auto}
   .pl-item{padding:2px 0;cursor:pointer}
   .pl-item.active{color:#c9a87c;font-weight:bold}
+
+  #messageBoard{background:#1c1614;border:1px solid #3a2e28;border-radius:8px;padding:14px;margin-top:16px}
+  #messageBoard h3{font-size:16px;margin-bottom:10px;color:#d4c4a8}
+  .msg-form{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .msg-form input,.msg-form textarea{background:#2a221e;border:1px solid #4a3c34;color:var(--text);padding:8px;border-radius:4px}
+  .msg-item{padding:8px 0;border-bottom:1px solid #2a221e;font-size:13px}
+  .msg-item .name{color:#c9a87c;font-weight:bold}
+  .msg-item .time{color:#8a7a6a;font-size:12px;margin-left:8px}
+  #adminPanel{margin-top:10px;padding:10px;background:#2a221e;border-radius:6px;display:none}
+  .pending{opacity:0.6;font-style:italic}
+
 </style>
 </head>
 <body>
@@ -142,6 +153,24 @@
     </div>
   </div>
 
+  
+  <div id="messageBoard">
+    <h3>留言板（审核后显示）</h3>
+    <div class="msg-form">
+      <input id="msgName" placeholder="昵称" maxlength="20" />
+      <textarea id="msgContent" placeholder="写点什么..." rows="2" maxlength="200"></textarea>
+      <button onclick="submitMessage()">提交留言</button>
+    </div>
+    <div id="messages"></div>
+    <div style="margin-top:10px;font-size:12px">
+      <button onclick="toggleAdmin()" style="font-size:12px;padding:4px 8px">管理员</button>
+    </div>
+    <div id="adminPanel">
+      <div style="font-size:13px;margin-bottom:6px">待审核留言：</div>
+      <div id="pendingList"></div>
+    </div>
+  </div>
+
   <div id="musicPlayer">
     <div id="musicControls">
       <input type="file" id="musicFile" accept="audio/*" multiple style="display:none" onchange="loadMusic(this)" />
@@ -156,7 +185,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, onSnapshot, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBklZc4IxKUOKBWgQAqjy7K4_RGTx8fh7Y",
@@ -179,6 +208,8 @@ window.orderBy = orderBy;
 window.limit = limit;
 window.getDocs = getDocs;
 window.onSnapshot = onSnapshot;
+window.updateDoc = updateDoc;
+window.doc = doc;
 
 const scoresRef = collection(db, "scores");
 onSnapshot(query(scoresRef, orderBy("pnl", "desc"), limit(20)), (snapshot) => {
@@ -757,6 +788,78 @@ setMode('realtime');
 setInterval(()=>{ if(mode==='realtime') updateRealtime(); }, 6000);
 window.addEventListener('resize', drawChart);
 setTimeout(()=>renderAllLeaderboards(), 1500);
+setTimeout(()=>loadMessages(), 2000);
+
+
+// Message board
+const ADMIN_PASS = 'admin123'; // 可自行修改
+
+async function submitMessage(){
+  const name = document.getElementById('msgName').value.trim() || '匿名';
+  const text = document.getElementById('msgContent').value.trim();
+  if(!text) return alert('请输入内容');
+  try{
+    await window.addDoc(window.collection(window.db, "messages"), {
+      name, text, approved: false, ts: Date.now()
+    });
+    document.getElementById('msgContent').value = '';
+    alert('提交成功，审核通过后会显示');
+  }catch(e){
+    alert('提交失败：'+e.message);
+  }
+}
+
+function toggleAdmin(){
+  const pass = prompt('管理员密码：');
+  if(pass === ADMIN_PASS){
+    document.getElementById('adminPanel').style.display = 'block';
+    loadPending();
+  } else if(pass){
+    alert('密码错误');
+  }
+}
+
+async function loadPending(){
+  const q = window.query(window.collection(window.db, "messages"), window.orderBy("ts", "desc"), window.limit(50));
+  const snap = await window.getDocs(q);
+  const pending = [];
+  snap.forEach(doc => {
+    const d = doc.data();
+    if(!d.approved) pending.push({id:doc.id, ...d});
+  });
+  document.getElementById('pendingList').innerHTML = pending.length ? pending.map(m =>
+    `<div class="msg-item pending">${m.name}: ${m.text} <button onclick="approveMsg('${m.id}')" style="font-size:12px;padding:2px 6px">通过</button></div>`
+  ).join('') : '<div style="color:#8a7a6a">暂无待审核</div>';
+}
+
+async function approveMsg(id){
+  try{
+    await window.updateDoc(window.doc(window.db, "messages", id), {approved: true});
+    alert('已通过');
+    loadPending();
+    loadMessages();
+  }catch(e){
+    alert('操作失败');
+  }
+}
+
+function loadMessages(){
+  const q = window.query(window.collection(window.db, "messages"), window.orderBy("ts", "desc"), window.limit(30));
+  window.onSnapshot(q, (snap) => {
+    const list = [];
+    snap.forEach(doc => {
+      const d = doc.data();
+      if(d.approved) list.push(d);
+    });
+    document.getElementById('messages').innerHTML = list.length ? list.map(m =>
+      `<div class="msg-item"><span class="name">${m.name}</span><span class="time">${new Date(m.ts).toLocaleString()}</span><div>${m.text}</div></div>`
+    ).join('') : '<div style="color:#8a7a6a;font-size:13px">暂无留言</div>';
+  });
+}
+
+// Need updateDoc and doc
+window.updateDoc = null;
+window.doc = null;
 
 // Slight grid variation on each load
 (function(){
