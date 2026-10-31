@@ -11,10 +11,11 @@
   h1{font-size:22px;margin-bottom:6px;color:#e8dcc8}
   .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap}
   .cash{font-size:18px;color:#c9a87c;font-weight:bold}
-  .mode-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .mode-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
   .mode-bar button.active{background:#6b5a45}
   button{background:#6b5a45;border:1px solid #8b7355;color:#f0e6d8;padding:7px 12px;border-radius:4px;cursor:pointer}
   button.short{background:#8a5a3a} button.sell{background:#8a3a3a}
+  select{background:#2a221e;border:1px solid #4a3c34;color:var(--text);padding:6px 10px;border-radius:4px}
   .section{background:#1c1614;border:1px solid #3a2e28;border-radius:8px;padding:14px;margin-bottom:14px}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{padding:6px 4px;border-bottom:1px solid #2a221e;text-align:left}
@@ -27,7 +28,7 @@
   .progress-wrap{background:#2a221e;height:8px;border-radius:4px;overflow:hidden}
   .progress-bar{height:100%;background:#c9a87c;width:0%}
   #chartBox{background:#12100e;border:1px solid #3a2e28;border-radius:8px;padding:10px;margin-bottom:14px}
-  canvas{width:100%;height:220px;display:block}
+  canvas{width:100%;height:240px;display:block}
 </style>
 </head>
 <body>
@@ -45,7 +46,7 @@
     <div class="progress-wrap"><div class="progress-bar" id="dayProgress"></div></div>
     <div style="font-size:12px;color:#8a7a6a;text-align:right" id="progressText">进度 0%</div>
   </div>
-  <div id="chartBox" style="display:none"><canvas id="chart"></canvas></div>
+  <div id="chartBox"><canvas id="chart"></canvas></div>
   <div class="indices" id="indices" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
   <div class="section">
     <h2>自选</h2>
@@ -97,8 +98,6 @@ function setMode(m){
   if(m==='offline'){
     initOffline();
     simTimer = setInterval(stepOffline, 800);
-    if(watchlist[0]) document.getElementById('chartSelect').value = watchlist[0].code;
-    drawChart();
   } else updateRealtime();
 }
 
@@ -106,10 +105,12 @@ function initOffline(){
   simTime = 0;
   watchlist.forEach(w=>{
     quotes[w.code] = {name:w.name, price:w.base, change:0, pre:w.base};
-    priceHistory[w.code] = [w.base];
+    priceHistory[w.code] = Array.from({length:20}, ()=> w.base*(1+(Math.random()-0.5)*0.02));
   });
   updateChartSelect();
+  document.getElementById('chartSelect').value = watchlist[0].code;
   renderAll();
+  drawChart();
   document.getElementById('updateTime').textContent = '离线模拟开始';
 }
 
@@ -156,21 +157,27 @@ function updateChartSelect(){
   const cur = sel.value;
   sel.innerHTML = '<option value="">选择图表</option>' + watchlist.map(w=>`<option value="${w.code}">${w.name} ${w.code}</option>`).join('');
   if(cur) sel.value = cur;
-  else if(watchlist[0]) sel.value = watchlist[0].code;
 }
 
 function drawChart(){
-  const code = document.getElementById('chartSelect').value;
+  const code = document.getElementById('chartSelect').value || watchlist[0].code;
   const box = document.getElementById('chartBox');
   const canvas = document.getElementById('chart');
   const hist = priceHistory[code];
-  if(!code || !hist || hist.length<2){ box.style.display='none'; return; }
+  if(!hist || hist.length<2){ 
+    // 绘制空图提示
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth*2; canvas.height=480;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='#8a7a6a'; ctx.font='28px Georgia';
+    ctx.fillText('等待数据...', canvas.width/2-60, canvas.height/2);
+    return; 
+  }
   box.style.display='block';
 
   const ctx = canvas.getContext('2d');
-  const dpr = 2;
-  const w = canvas.width = canvas.offsetWidth * dpr;
-  const h = canvas.height = 440;
+  const w = canvas.width = canvas.offsetWidth * 2;
+  const h = canvas.height = 480;
   ctx.clearRect(0,0,w,h);
 
   // 网格
@@ -199,10 +206,10 @@ function drawChart(){
     if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
   });
   ctx.strokeStyle = '#ff4d4f';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2.5;
   ctx.stroke();
 
-  // 黄色均线（简单移动平均）
+  // 黄色均线
   const ma = [];
   for(let i=0;i<prices.length;i++){
     const start = Math.max(0,i-9);
@@ -216,17 +223,17 @@ function drawChart(){
     if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
   });
   ctx.strokeStyle = '#f5c518';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.stroke();
 
-  // 成交量柱（模拟）
+  // 成交量
   const volH = h*0.18;
-  for(let i=0;i<prices.length;i++){
+  for(let i=1;i<prices.length;i++){
     const x = (i/(prices.length-1))*w;
-    const vol = 0.3 + Math.random()*0.7;
+    const vol = 0.25 + Math.random()*0.75;
     const vh = vol * volH;
-    ctx.fillStyle = prices[i] >= (prices[i-1]||prices[i]) ? '#ff4d4f66' : '#52c41a66';
-    ctx.fillRect(x-2, h-vh, 4, vh);
+    ctx.fillStyle = prices[i] >= prices[i-1] ? '#ff4d4f88' : '#52c41a88';
+    ctx.fillRect(x-3, h-vh, 5, vh);
   }
 }
 
