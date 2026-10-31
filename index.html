@@ -77,11 +77,11 @@
           <div class="summary-item"><div class="label">可用资金</div><div class="value" id="sCash">100000</div></div>
           <div class="summary-item"><div class="label">持仓市值</div><div class="value" id="sMv">0</div></div>
           <div class="summary-item"><div class="label">总资产</div><div class="value" id="sTotal">100000</div></div>
-          <div class="summary-item"><div class="label">浮盈</div><div class="value" id="sPnl">0</div></div>
+          <div class="summary-item"><div class="label">当日累计盈亏</div><div class="value" id="sPnl">0</div></div>
           <div class="summary-item"><div class="label">仓位</div><div class="value" id="sRatio">0%</div></div>
         </div>
         <table>
-          <thead><tr><th>名称</th><th>代码</th><th>方向</th><th>数量</th><th>成本</th><th>现价</th><th>盈亏</th><th>操作</th></tr></thead>
+          <thead><tr><th>名称</th><th>代码</th><th>方向</th><th>数量</th><th>成本</th><th>现价</th><th>浮盈</th><th>操作</th></tr></thead>
           <tbody id="positions"></tbody>
         </table>
       </div>
@@ -91,7 +91,7 @@
       <div class="leaderboard">
         <h3>当日盈利排行榜</h3>
         <div id="leaderboardList"></div>
-        <div style="font-size:11px;color:#8a7a6a;margin-top:8px;text-align:center">免注册 · 收盘后可选择上榜</div>
+        <div style="font-size:11px;color:#8a7a6a;margin-top:8px;text-align:center">收盘后可自取名上榜</div>
       </div>
     </div>
   </div>
@@ -108,55 +108,46 @@ let watchlist = [
 let positions = {};
 let quotes = {};
 let priceHistory = {};
+let trades = []; // {code, type:'B'|'S', price, simTime, pnl}
 let simTime = 0;
 let simTimer = null;
-let myName = localStorage.getItem('aShareName') || generateName();
-let myTodayPnl = 0;
-
-function generateName(){
-  const prefixes = ['散户','游资','短线','长线','量化','价值','技术','波段','趋势'];
-  const suffixes = ['小王','阿强','老李','小张','阿明','小刘','老周','阿林','小陈','老吴'];
-  const name = prefixes[Math.floor(Math.random()*prefixes.length)] + suffixes[Math.floor(Math.random()*suffixes.length)] + Math.floor(Math.random()*100);
-  localStorage.setItem('aShareName', name);
-  return name;
-}
+let myName = localStorage.getItem('aShareName') || '';
+let realizedPnl = 0; // 累计已实现盈亏
 
 function loadLeaderboard(){
   let lb = JSON.parse(localStorage.getItem('aShareLB') || '[]');
   if(lb.length < 8){
-    const fake = [];
+    const prefixes = ['散户','游资','短线','长线','量化','价值','技术','波段','趋势'];
+    const suffixes = ['小王','阿强','老李','小张','阿明','小刘','老周','阿林','小陈','老吴'];
     for(let i=0;i<10;i++){
-      fake.push({name:generateName(), pnl: Math.floor((Math.random()-0.3)*15000)});
+      const name = prefixes[Math.floor(Math.random()*prefixes.length)] + suffixes[Math.floor(Math.random()*suffixes.length)] + Math.floor(Math.random()*100);
+      lb.push({name, pnl: Math.floor((Math.random()-0.3)*15000)});
     }
-    lb = [...fake, ...lb].slice(0,15);
     localStorage.setItem('aShareLB', JSON.stringify(lb));
   }
   return lb;
 }
 
-function saveMyPnl(pnl, force=false){
-  myTodayPnl = pnl;
+function saveMyPnl(pnl, name){
   let lb = loadLeaderboard();
-  const idx = lb.findIndex(x=>x.name===myName);
+  const idx = lb.findIndex(x=>x.name===name);
   if(idx>=0) lb[idx].pnl = pnl;
-  else lb.push({name:myName, pnl});
+  else lb.push({name, pnl});
   lb.sort((a,b)=>b.pnl-a.pnl);
   localStorage.setItem('aShareLB', JSON.stringify(lb.slice(0,20)));
   renderLeaderboard();
 }
 
 function askSubmitToLeaderboard(pnl){
-  const msg = `今日模拟结束\n您的盈利：${pnl>=0?'+':''}${fmt(pnl)}\n\n是否留名上榜？（当前昵称：${myName}）`;
+  const msg = `今日模拟结束\n累计盈利：${pnl>=0?'+':''}${fmt(pnl)}\n\n是否留名上榜？`;
   if(confirm(msg)){
-    const newName = prompt('留名昵称（可修改）：', myName);
-    if(newName && newName.trim()){
-      myName = newName.trim();
+    const name = prompt('请输入您的昵称：', myName || '散户小王');
+    if(name && name.trim()){
+      myName = name.trim();
       localStorage.setItem('aShareName', myName);
+      saveMyPnl(pnl, myName);
+      alert('已上榜！');
     }
-    saveMyPnl(pnl);
-    alert('已上榜！');
-  } else {
-    alert('已取消上榜');
   }
 }
 
@@ -189,6 +180,8 @@ function setMode(m){
 
 function initOffline(){
   simTime = 0;
+  trades = [];
+  realizedPnl = 0;
   watchlist.forEach(w=>{
     quotes[w.code] = {name:w.name, price:w.base, change:0, pre:w.base};
     priceHistory[w.code] = [w.base];
@@ -204,8 +197,8 @@ function stepOffline(){
   if(simTime>=240){
     clearInterval(simTimer);
     document.getElementById('updateTime').textContent='收盘';
-    const finalPnl = getCurrentPnl();
-    setTimeout(()=> askSubmitToLeaderboard(finalPnl), 300);
+    const totalPnl = realizedPnl + getFloatingPnl();
+    setTimeout(()=> askSubmitToLeaderboard(totalPnl), 300);
     return;
   }
   simTime++;
@@ -225,7 +218,7 @@ function stepOffline(){
   document.getElementById('updateTime').textContent = `离线 ${simTime}/240 分`;
 }
 
-function getCurrentPnl(){
+function getFloatingPnl(){
   let pnl=0;
   Object.entries(positions).forEach(([code,p])=>{
     const price = quotes[code]?.price || p.cost;
@@ -334,6 +327,21 @@ function drawChart(){
   ctx.lineWidth = 2;
   ctx.stroke();
 
+  // B/S 买卖点
+  trades.filter(t=>t.code===code).forEach(t=>{
+    if(mode==='offline' && t.simTime > simTime) return;
+    const idx = Math.min(prices.length-1, Math.floor((t.simTime/240)*prices.length));
+    const x = (idx/(prices.length-1)) * drawWidth;
+    const y = bot - ((t.price-min)/range)*(bot-top);
+    ctx.fillStyle = t.type==='B' ? '#52c41a' : '#ff4d4f';
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(t.type, x-5, y+5);
+  });
+
   const volH = h*0.18;
   for(let i=1;i<prices.length;i++){
     const x = (i/(prices.length-1)) * drawWidth;
@@ -365,7 +373,9 @@ function renderAll(){
     </tr>`;
   }).join('');
 
-  let mv=0, pnl=0;
+  let mv=0;
+  const floating = getFloatingPnl();
+  const totalPnl = realizedPnl + floating;
   const rows = Object.entries(positions).map(([code, p])=>{
     const q = quotes[code]||{};
     const price = q.price || p.cost;
@@ -374,7 +384,6 @@ function renderAll(){
     const value = price * abs;
     const profit = isLong ? (price-p.cost)*abs : (p.cost-price)*abs;
     mv += isLong ? value : -value;
-    pnl += profit;
     return `<tr>
       <td>${p.name}</td><td>${code}</td>
       <td>${isLong?'多':'空'}</td><td>${abs}</td>
@@ -390,8 +399,8 @@ function renderAll(){
   document.getElementById('sCash').textContent = fmt(cash);
   document.getElementById('sMv').textContent = fmt(mv);
   document.getElementById('sTotal').textContent = fmt(total);
-  document.getElementById('sPnl').textContent = (pnl>0?'+':'')+fmt(pnl);
-  document.getElementById('sPnl').className = 'value '+color(pnl);
+  document.getElementById('sPnl').textContent = (totalPnl>0?'+':'')+fmt(totalPnl);
+  document.getElementById('sPnl').className = 'value '+color(totalPnl);
   document.getElementById('cash').textContent = fmt(cash);
   const used = Object.values(positions).reduce((s,p)=>s+Math.abs(p.shares)*(quotes[Object.keys(positions).find(k=>positions[k]===p)]?.price||p.cost),0);
   document.getElementById('sRatio').textContent = ((used/(cash+Math.abs(mv)||1))*100).toFixed(1)+'%';
@@ -416,6 +425,7 @@ function openPos(code, side){
   const newAbs = Math.abs(pos.shares);
   pos.cost = newAbs>0 ? totalCost / newAbs : 0;
   if(pos.shares===0) delete positions[code];
+  trades.push({code, type:'B', price, simTime});
   renderAll();
   document.getElementById('chartSelect').value = code;
   drawChart();
@@ -427,9 +437,14 @@ function closePos(code){
   if(!pos) return;
   const q = quotes[code];
   if(!q || !q.price){ alert('暂无行情'); return; }
-  cash += q.price * Math.abs(pos.shares);
+  const abs = Math.abs(pos.shares);
+  const profit = pos.shares>0 ? (q.price-pos.cost)*abs : (pos.cost-q.price)*abs;
+  realizedPnl += profit;
+  cash += q.price * abs;
   delete positions[code];
+  trades.push({code, type:'S', price:q.price, simTime, pnl:profit});
   renderAll();
+  drawChart();
 }
 
 function addStock(){
@@ -451,6 +466,8 @@ function resetGame(){
   if(!confirm('重置资金和持仓？')) return;
   cash = 100000;
   positions = {};
+  realizedPnl = 0;
+  trades = [];
   renderAll();
   if(mode==='offline') initOffline();
 }
