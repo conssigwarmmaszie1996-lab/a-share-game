@@ -228,6 +228,9 @@ onSnapshot(query(scoresRef, orderBy("pnl", "desc"), limit(20)), (snapshot) => {
   snapshot.forEach(doc => list.push({id:doc.id, ...doc.data()}));
   window.currentScores = list;
   if(window.renderAllLeaderboards) window.renderAllLeaderboards();
+}, (error) => {
+  console.error('排行榜加载失败', error);
+  document.getElementById('profitList').innerHTML = '<div style="color:#ff4d4f;font-size:13px">加载失败，请检查 Firebase 规则是否允许读取</div>';
 });
 </script>
 
