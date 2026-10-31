@@ -112,9 +112,9 @@
       </div>
       <div class="panel">
         <h3>本月盈利冠军</h3>
-        <div id="monthChamp" class="month-champ">暂无</div>
+        <div id="monthChamp" class="month-champ">加载中...</div>
         <h3 style="margin-top:10px">本月亏损王</h3>
-        <div id="monthKing" class="month-champ">暂无</div>
+        <div id="monthKing" class="month-champ">加载中...</div>
       </div>
       <div class="panel">
         <h3>成就</h3>
@@ -126,6 +126,42 @@
       </div>
     </div>
   </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBklZc4IxKUOKBWgQAqjy7K4_RGTx8fh7Y",
+  authDomain: "a-share-game.firebaseapp.com",
+  projectId: "a-share-game",
+  storageBucket: "a-share-game.firebasestorage.app",
+  messagingSenderId: "1011455672782",
+  appId: "1:1011455672782:web:5266b1a0e7ad1c88692b9f",
+  measurementId: "G-8KQYGXERMM"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window.db = db;
+window.collection = collection;
+window.addDoc = addDoc;
+window.query = query;
+window.orderBy = orderBy;
+window.limit = limit;
+window.getDocs = getDocs;
+window.onSnapshot = onSnapshot;
+
+// 实时监听排行榜
+const scoresRef = collection(db, "scores");
+onSnapshot(query(scoresRef, orderBy("pnl", "desc"), limit(20)), (snapshot) => {
+  const list = [];
+  snapshot.forEach(doc => list.push({id:doc.id, ...doc.data()}));
+  window.currentScores = list;
+  if(window.renderAllLeaderboards) window.renderAllLeaderboards();
+});
+</script>
 
 <script>
 let cash = 100000;
@@ -148,6 +184,7 @@ let realizedPnl = 0;
 let achievements = JSON.parse(localStorage.getItem('aShareAch') || '{}');
 let challenge = null;
 let replayData = null;
+window.currentScores = [];
 
 function playSound(type){
   try{
@@ -185,51 +222,19 @@ function renderAchievements(){
   ).join('');
 }
 
-function loadLeaderboard(){
-  let lb = JSON.parse(localStorage.getItem('aShareLB') || '[]');
-  if(lb.length < 8){
-    const prefixes = ['散户','游资','短线','长线','量化','价值','技术','波段','趋势'];
-    const suffixes = ['小王','阿强','老李','小张','阿明','小刘','老周','阿林','小陈','老吴'];
-    for(let i=0;i<12;i++){
-      const name = prefixes[Math.floor(Math.random()*prefixes.length)] + suffixes[Math.floor(Math.random()*suffixes.length)] + Math.floor(Math.random()*100);
-      lb.push({name, pnl: Math.floor((Math.random()-0.4)*18000)});
-    }
-    localStorage.setItem('aShareLB', JSON.stringify(lb));
+async function saveMyPnl(pnl, name){
+  try{
+    await window.addDoc(window.collection(window.db, "scores"), {
+      name: name,
+      pnl: Number(pnl),
+      date: new Date().toISOString().slice(0,10),
+      month: new Date().toISOString().slice(0,7),
+      ts: Date.now()
+    });
+    alert('已上榜！');
+  }catch(e){
+    alert('上榜失败：'+e.message);
   }
-  return lb;
-}
-
-function loadMonthData(){
-  const key = 'aShareMonth_' + new Date().toISOString().slice(0,7);
-  let data = JSON.parse(localStorage.getItem(key) || '[]');
-  if(data.length < 5){
-    const prefixes = ['散户','游资','短线','长线','量化'];
-    const suffixes = ['小王','阿强','老李','小张','阿明'];
-    for(let i=0;i<8;i++){
-      const name = prefixes[Math.floor(Math.random()*prefixes.length)] + suffixes[Math.floor(Math.random()*suffixes.length)] + Math.floor(Math.random()*50);
-      data.push({name, pnl: Math.floor((Math.random()-0.35)*50000)});
-    }
-    localStorage.setItem(key, JSON.stringify(data));
-  }
-  return data;
-}
-
-function saveMyPnl(pnl, name){
-  let lb = loadLeaderboard();
-  const idx = lb.findIndex(x=>x.name===name);
-  if(idx>=0) lb[idx].pnl = pnl;
-  else lb.push({name, pnl});
-  lb.sort((a,b)=>b.pnl-a.pnl);
-  localStorage.setItem('aShareLB', JSON.stringify(lb.slice(0,30)));
-
-  const key = 'aShareMonth_' + new Date().toISOString().slice(0,7);
-  let month = JSON.parse(localStorage.getItem(key) || '[]');
-  const midx = month.findIndex(x=>x.name===name);
-  if(midx>=0) month[midx].pnl += pnl;
-  else month.push({name, pnl});
-  localStorage.setItem(key, JSON.stringify(month));
-
-  renderAllLeaderboards();
 }
 
 function askSubmitToLeaderboard(pnl){
@@ -240,7 +245,6 @@ function askSubmitToLeaderboard(pnl){
       myName = name.trim();
       localStorage.setItem('aShareName', myName);
       saveMyPnl(pnl, myName);
-      alert('已上榜！');
     }
   }
   const rate = pnl / 100000 * 100;
@@ -250,34 +254,36 @@ function askSubmitToLeaderboard(pnl){
 }
 
 function renderAllLeaderboards(){
-  const lb = loadLeaderboard();
-  const profit = [...lb].sort((a,b)=>b.pnl-a.pnl).slice(0,10);
-  const loss = [...lb].sort((a,b)=>a.pnl-b.pnl).slice(0,10);
+  const list = window.currentScores || [];
+  const profit = [...list].sort((a,b)=>b.pnl-a.pnl).slice(0,10);
+  const loss = [...list].sort((a,b)=>a.pnl-b.pnl).slice(0,10);
 
-  document.getElementById('profitList').innerHTML = profit.map((item,i)=>{
+  document.getElementById('profitList').innerHTML = profit.length ? profit.map((item,i)=>{
     const isMe = item.name === myName;
     return `<div class="lb-item ${isMe?'me':''}">
       <span>${i+1}</span>
       <span>${item.name}${isMe?'（我）':''}</span>
       <span class="${item.pnl>=0?'up':'down'}">${item.pnl>=0?'+':''}${fmt(item.pnl)}</span>
     </div>`;
-  }).join('');
+  }).join('') : '<div style="color:#8a7a6a;font-size:13px">暂无数据</div>';
 
-  document.getElementById('lossList').innerHTML = loss.map((item,i)=>{
+  document.getElementById('lossList').innerHTML = loss.length ? loss.map((item,i)=>{
     const isMe = item.name === myName;
     return `<div class="lb-item ${isMe?'me':''}">
       <span>${i+1}</span>
       <span>${item.name}${isMe?'（我）':''}</span>
       <span class="${item.pnl>=0?'up':'down'}">${item.pnl>=0?'+':''}${fmt(item.pnl)}</span>
     </div>`;
-  }).join('');
+  }).join('') : '<div style="color:#8a7a6a;font-size:13px">暂无数据</div>';
 
-  const month = loadMonthData();
-  const champ = [...month].sort((a,b)=>b.pnl-a.pnl)[0];
-  const king = [...month].sort((a,b)=>a.pnl-b.pnl)[0];
+  const thisMonth = new Date().toISOString().slice(0,7);
+  const monthList = list.filter(x=>x.month===thisMonth);
+  const champ = [...monthList].sort((a,b)=>b.pnl-a.pnl)[0];
+  const king = [...monthList].sort((a,b)=>a.pnl-b.pnl)[0];
   document.getElementById('monthChamp').innerHTML = champ ? `${champ.name} <span class="up">+${fmt(champ.pnl)}</span>` : '暂无';
   document.getElementById('monthKing').innerHTML = king ? `${king.name} <span class="down">${fmt(king.pnl)}</span>` : '暂无';
 }
+window.renderAllLeaderboards = renderAllLeaderboards;
 
 function fmt(n){ return Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function color(v){ return v>0?'up':v<0?'down':''; }
@@ -637,11 +643,11 @@ function replay(){
 }
 
 renderAchievements();
-renderAllLeaderboards();
 updateChartSelect();
 setMode('realtime');
 setInterval(()=>{ if(mode==='realtime') updateRealtime(); }, 6000);
 window.addEventListener('resize', drawChart);
+setTimeout(()=>renderAllLeaderboards(), 1500);
 </script>
 </body>
 </html>
