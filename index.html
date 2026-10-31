@@ -76,10 +76,24 @@
 
 
   @media (max-width: 800px) {
-    .layout { grid-template-columns: 1fr; }
-    .sidebar { position: static; max-height: none; }
-    body { padding: 10px; }
-    #newsBox { right: 10px; width: 200px; }
+    body { padding: 8px; max-width: 100%; }
+    .layout { grid-template-columns: 1fr; gap: 12px; }
+    .sidebar { position: static; max-height: none; order: -1; }
+    .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .cash { font-size: 16px; }
+    .mode-bar { gap: 6px; }
+    .mode-bar button { padding: 8px 10px; font-size: 13px; }
+    .section { padding: 12px; }
+    .summary { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+    .summary-item .value { font-size: 14px; }
+    .panel { padding: 10px; }
+    .panel h3 { font-size: 15px; }
+    #newsBox { position: fixed; top: 8px; right: 8px; width: 160px; max-height: 120px; font-size: 12px; }
+    #musicPlayer { padding: 10px; }
+    #messageBoard { padding: 12px; }
+    table { font-size: 12px; }
+    th, td { padding: 4px 2px; }
+    button { padding: 6px 10px; }
   }
 
 </style>
