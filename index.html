@@ -69,6 +69,11 @@
   #adminPanel{margin-top:10px;padding:10px;background:#2a221e;border-radius:6px;display:none}
   .pending{opacity:0.6;font-style:italic}
 
+
+  #loginBar{display:flex;align-items:center;gap:8px;font-size:14px}
+  #loginBar input{width:120px;padding:5px 8px}
+  #userInfo{color:#c9a87c}
+
 </style>
 </head>
 <body>
@@ -76,6 +81,12 @@
     <div>
       <div class="header">
         <h1>模拟大A 游戏</h1>
+        <div id="loginBar">
+          <span id="userInfo"></span>
+          <input id="nickInput" placeholder="输入昵称" maxlength="16" />
+          <button onclick="doLogin()" id="btnLogin">登录</button>
+          <button onclick="doLogout()" id="btnLogout" style="display:none">退出</button>
+        </div>
         <div class="cash">可用资金：<span id="cash">100,000.00</span></div>
       </div>
       <div class="mode-bar">
@@ -238,6 +249,40 @@ let trades = [];
 let simTime = 0;
 let simTimer = null;
 let myName = localStorage.getItem('aShareName') || '';
+
+function updateLoginUI(){
+  const info = document.getElementById('userInfo');
+  const nickInput = document.getElementById('nickInput');
+  const btnLogin = document.getElementById('btnLogin');
+  const btnLogout = document.getElementById('btnLogout');
+  if(myName){
+    info.textContent = '欢迎，' + myName;
+    nickInput.style.display = 'none';
+    btnLogin.style.display = 'none';
+    btnLogout.style.display = 'inline-block';
+  } else {
+    info.textContent = '未登录';
+    nickInput.style.display = 'inline-block';
+    btnLogin.style.display = 'inline-block';
+    btnLogout.style.display = 'none';
+  }
+}
+
+function doLogin(){
+  const name = document.getElementById('nickInput').value.trim();
+  if(!name) return alert('请输入昵称');
+  myName = name;
+  localStorage.setItem('aShareName', myName);
+  updateLoginUI();
+  alert('登录成功');
+}
+
+function doLogout(){
+  myName = '';
+  localStorage.removeItem('aShareName');
+  updateLoginUI();
+}
+
 let realizedPnl = 0;
 let achievements = JSON.parse(localStorage.getItem('aShareAch') || '{}');
 let challenge = null;
@@ -304,6 +349,7 @@ function unlock(id, name){
     alert('解锁成就：'+name);
   }
   renderAchievements();
+updateLoginUI();
 }
 
 function renderAchievements(){
@@ -783,6 +829,7 @@ function replay(){
 }
 
 renderAchievements();
+updateLoginUI();
 updateChartSelect();
 setMode('realtime');
 setInterval(()=>{ if(mode==='realtime') updateRealtime(); }, 6000);
@@ -795,7 +842,7 @@ setTimeout(()=>loadMessages(), 2000);
 const ADMIN_PASS = 'vFTR6CtrpjTw6NY'; // 可自行修改
 
 async function submitMessage(){
-  const name = document.getElementById('msgName').value.trim() || '匿名';
+  const name = document.getElementById('msgName').value.trim() || myName || '匿名';
   const text = document.getElementById('msgContent').value.trim();
   if(!text) return alert('请输入内容');
   try{
