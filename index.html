@@ -44,6 +44,9 @@
   .news.good{border-left:3px solid #52c41a}
   .news.bad{border-left:3px solid #ff4d4f}
   .month-champ{font-size:13px;padding:6px 0;border-bottom:1px solid #2a221e}
+  #musicPlayer{background:#1c1614;border:1px solid #3a2e28;border-radius:8px;padding:12px;margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  #musicPlayer audio{flex:1;min-width:200px;height:36px}
+  #musicName{font-size:13px;color:#d4c4a8;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -128,6 +131,13 @@
     </div>
   </div>
 
+  <div id="musicPlayer">
+    <input type="file" id="musicFile" accept="audio/*" style="display:none" onchange="loadMusic(this)" />
+    <button onclick="document.getElementById('musicFile').click()">选择音乐</button>
+    <span id="musicName">未选择音乐</span>
+    <audio id="audio" controls style="flex:1"></audio>
+  </div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -176,7 +186,7 @@ let watchlist = [
 let positions = {};
 let quotes = {};
 let priceHistory = {};
-let fullHistory = {}; // 存储真实分时数据
+let fullHistory = {};
 let trades = [];
 let simTime = 0;
 let simTimer = null;
@@ -187,6 +197,16 @@ let challenge = null;
 let replayData = null;
 let simDate = '';
 window.currentScores = [];
+
+function loadMusic(input){
+  const file = input.files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  const audio = document.getElementById('audio');
+  audio.src = url;
+  document.getElementById('musicName').textContent = file.name;
+  audio.play().catch(()=>{});
+}
 
 function playSound(type){
   try{
@@ -308,7 +328,6 @@ function startChallenge(){
 }
 
 function showNews(){
-  // 真实走势下减少随机消息，或可选
   if(mode!=='offline' || Math.random()>0.08) return;
   const goods = ['重大利好！业绩超预期','政策支持，板块拉升','机构大举买入'];
   const bads = ['突发利空，业绩下滑','监管风险提示','大宗减持'];
@@ -336,14 +355,13 @@ function setMode(m){
 
 async function fetchPrevDayData(code){
   const secid = (code.startsWith('6')?'1.':'0.')+code;
-  // 取最近的交易日分时（大概是上一个交易日）
   const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&klt=1&fqt=1&lmt=240&end=20500101&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61`;
   try{
     const res = await fetch(url);
     const data = await res.json();
     const klines = data.data?.klines || [];
     if(klines.length===0) return null;
-    const prices = klines.map(k => parseFloat(k.split(',')[2])); // 收盘价
+    const prices = klines.map(k => parseFloat(k.split(',')[2]));
     const date = klines[0].split(',')[0].slice(0,10);
     return {prices, date, open: parseFloat(klines[0].split(',')[1])};
   }catch(e){
@@ -370,7 +388,6 @@ async function initOffline(){
       if(!simDate) simDate = hist.date;
       loaded++;
     } else {
-      // 降级到随机走势
       quotes[w.code] = {name:w.name, price:w.base, change:0, pre:w.base};
       priceHistory[w.code] = [w.base];
       fullHistory[w.code] = null;
@@ -408,7 +425,6 @@ function stepOffline(){
     if(full && full.length > simTime){
       q.price = full[simTime];
     } else {
-      // 随机降级
       const chg = (Math.random()-0.5)*0.009;
       q.price = Math.max(0.01, q.price*(1+chg));
     }
