@@ -8,7 +8,7 @@
   :root { --bg:#0c0a09; --card:#1c1614; --up:#ff4d4f; --down:#52c41a; --text:#d4c8b8; --muted:#8a7a6a; }
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Georgia,serif;background:var(--bg);color:var(--text);padding:16px;max-width:1300px;margin:0 auto}
-  .layout{display:grid;grid-template-columns:1fr 280px;gap:16px}
+  .layout{display:grid;grid-template-columns:1fr 300px;gap:16px}
   h1{font-size:22px;margin-bottom:6px;color:#e8dcc8}
   .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap}
   .cash{font-size:18px;color:#c9a87c;font-weight:bold}
@@ -32,13 +32,16 @@
   canvas{width:100%;height:240px;display:block}
   .add-bar{display:flex;gap:8px;margin-bottom:10px}
   .add-bar input{flex:1}
-  .leaderboard{background:#1c1614;border:1px solid #3a2e28;border-radius:8px;padding:12px;position:sticky;top:16px}
-  .leaderboard h3{font-size:15px;margin-bottom:10px;color:#d4c4a8}
-  .lb-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #2a221e;font-size:13px}
-  .lb-item.me{background:#2a221e;border-radius:4px;padding:6px}
-  .lb-rank{width:24px;color:#8a7a6a}
-  .lb-name{flex:1}
-  .lb-pnl{font-weight:bold}
+  .sidebar{position:sticky;top:16px}
+  .panel{background:#1c1614;border:1px solid #3a2e28;border-radius:8px;padding:12px;margin-bottom:12px}
+  .panel h3{font-size:15px;margin-bottom:8px;color:#d4c4a8}
+  .lb-item{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #2a221e;font-size:13px}
+  .lb-item.me{background:#2a221e;border-radius:4px;padding:5px}
+  .achieve{font-size:12px;padding:4px 0;border-bottom:1px solid #2a221e}
+  .achieve.done{color:#52c41a}
+  .news{background:#3a2e28;padding:8px;border-radius:4px;margin:6px 0;font-size:13px}
+  .news.good{border-left:3px solid #52c41a}
+  .news.bad{border-left:3px solid #ff4d4f}
 </style>
 </head>
 <body>
@@ -52,12 +55,21 @@
         <button id="btnRealtime" class="active" onclick="setMode('realtime')">实时</button>
         <button id="btnOffline" onclick="setMode('offline')">离线模拟当日</button>
         <button onclick="resetGame()">重置</button>
+        <button onclick="startChallenge()">挑战</button>
+        <button onclick="replay()">回放</button>
         <select id="chartSelect" onchange="drawChart()"><option value="">选择图表</option></select>
+        <select id="leverage" onchange="updateLeverage()">
+          <option value="1">1倍</option>
+          <option value="2">2倍杠杆</option>
+          <option value="3">3倍杠杆</option>
+          <option value="5">5倍杠杆</option>
+        </select>
       </div>
       <div id="progressSection" style="display:none">
         <div class="progress-wrap"><div class="progress-bar" id="dayProgress"></div></div>
         <div style="font-size:12px;color:#8a7a6a;text-align:right" id="progressText">进度 0%</div>
       </div>
+      <div id="newsBox"></div>
       <div id="chartBox"><canvas id="chart"></canvas></div>
       <div class="indices" id="indices" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
       <div class="section">
@@ -87,11 +99,18 @@
       </div>
       <div style="font-size:12px;color:#8a7a6a;text-align:right;margin-top:8px" id="updateTime"></div>
     </div>
-    <div>
-      <div class="leaderboard">
-        <h3>当日盈利排行榜</h3>
+    <div class="sidebar">
+      <div class="panel">
+        <h3>当日盈利排行</h3>
         <div id="leaderboardList"></div>
-        <div style="font-size:11px;color:#8a7a6a;margin-top:8px;text-align:center">收盘后可自取名上榜</div>
+      </div>
+      <div class="panel">
+        <h3>成就</h3>
+        <div id="achievements"></div>
+      </div>
+      <div class="panel">
+        <h3>今日挑战</h3>
+        <div id="challenge" style="font-size:13px;color:#d4c4a8">点击「挑战」开始</div>
       </div>
     </div>
   </div>
@@ -99,6 +118,7 @@
 <script>
 let cash = 100000;
 let mode = 'realtime';
+let leverage = 1;
 let watchlist = [
   {code:'600519', name:'贵州茅台', base:1680},
   {code:'000858', name:'五粮液', base:145},
@@ -108,11 +128,50 @@ let watchlist = [
 let positions = {};
 let quotes = {};
 let priceHistory = {};
-let trades = []; // {code, type:'B'|'S', price, simTime, pnl}
+let trades = [];
 let simTime = 0;
 let simTimer = null;
 let myName = localStorage.getItem('aShareName') || '';
-let realizedPnl = 0; // 累计已实现盈亏
+let realizedPnl = 0;
+let achievements = JSON.parse(localStorage.getItem('aShareAch') || '{}');
+let challenge = null;
+let replayData = null;
+
+function playSound(type){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = type==='buy'?440:type==='sell'?330:type==='win'?660:220;
+    g.gain.value = 0.08;
+    o.start(); o.stop(ctx.currentTime+0.15);
+  }catch(e){}
+}
+
+function unlock(id, name){
+  if(!achievements[id]){
+    achievements[id] = true;
+    localStorage.setItem('aShareAch', JSON.stringify(achievements));
+    playSound('win');
+    alert('解锁成就：'+name);
+  }
+  renderAchievements();
+}
+
+function renderAchievements(){
+  const list = [
+    {id:'first', name:'初次开仓'},
+    {id:'profit5', name:'单日盈利超 5%'},
+    {id:'profit10', name:'单日盈利超 10%'},
+    {id:'shortwin', name:'做空盈利'},
+    {id:'leverage', name:'使用杠杆'},
+    {id:'challenge', name:'完成挑战'}
+  ];
+  document.getElementById('achievements').innerHTML = list.map(a=>
+    `<div class="achieve ${achievements[a.id]?'done':''}">${achievements[a.id]?'✓':'○'} ${a.name}</div>`
+  ).join('');
+}
 
 function loadLeaderboard(){
   let lb = JSON.parse(localStorage.getItem('aShareLB') || '[]');
@@ -149,6 +208,10 @@ function askSubmitToLeaderboard(pnl){
       alert('已上榜！');
     }
   }
+  const rate = pnl / 100000 * 100;
+  if(rate >= 5) unlock('profit5','单日盈利超 5%');
+  if(rate >= 10) unlock('profit10','单日盈利超 10%');
+  if(challenge && pnl > 0) unlock('challenge','完成挑战');
 }
 
 function renderLeaderboard(){
@@ -156,15 +219,51 @@ function renderLeaderboard(){
   document.getElementById('leaderboardList').innerHTML = lb.map((item,i)=>{
     const isMe = item.name === myName;
     return `<div class="lb-item ${isMe?'me':''}">
-      <span class="lb-rank">${i+1}</span>
-      <span class="lb-name">${item.name}${isMe?'（我）':''}</span>
-      <span class="lb-pnl ${item.pnl>=0?'up':'down'}">${item.pnl>=0?'+':''}${fmt(item.pnl)}</span>
+      <span>${i+1}</span>
+      <span>${item.name}${isMe?'（我）':''}</span>
+      <span class="${item.pnl>=0?'up':'down'}">${item.pnl>=0?'+':''}${fmt(item.pnl)}</span>
     </div>`;
   }).join('');
 }
 
 function fmt(n){ return Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function color(v){ return v>0?'up':v<0?'down':''; }
+
+function updateLeverage(){
+  leverage = +document.getElementById('leverage').value;
+  if(leverage>1) unlock('leverage','使用杠杆');
+}
+
+function startChallenge(){
+  const challenges = [
+    '只用做空赚正收益',
+    '单笔盈利超过 3%',
+    '完成至少 3 次交易',
+    '不使用杠杆赚 2%'
+  ];
+  challenge = challenges[Math.floor(Math.random()*challenges.length)];
+  document.getElementById('challenge').textContent = '今日挑战：'+challenge;
+  alert('挑战开始：'+challenge);
+}
+
+function showNews(){
+  if(mode!=='offline' || Math.random()>0.15) return;
+  const goods = ['重大利好！业绩超预期','政策支持，板块拉升','机构大举买入'];
+  const bads = ['突发利空，业绩下滑','监管风险提示','大宗减持'];
+  const isGood = Math.random()>0.5;
+  const text = (isGood?goods:bads)[Math.floor(Math.random()*3)];
+  const div = document.createElement('div');
+  div.className = 'news '+(isGood?'good':'bad');
+  div.textContent = '【消息】'+text;
+  document.getElementById('newsBox').prepend(div);
+  setTimeout(()=>div.remove(), 8000);
+  Object.keys(quotes).forEach(code=>{
+    const q = quotes[code];
+    const impact = (isGood?1:-1) * (0.01+Math.random()*0.02);
+    q.price = Math.max(0.01, q.price*(1+impact));
+  });
+  playSound(isGood?'win':'sell');
+}
 
 function setMode(m){
   mode = m;
@@ -182,6 +281,7 @@ function initOffline(){
   simTime = 0;
   trades = [];
   realizedPnl = 0;
+  replayData = [];
   watchlist.forEach(w=>{
     quotes[w.code] = {name:w.name, price:w.base, change:0, pre:w.base};
     priceHistory[w.code] = [w.base];
@@ -198,10 +298,12 @@ function stepOffline(){
     clearInterval(simTimer);
     document.getElementById('updateTime').textContent='收盘';
     const totalPnl = realizedPnl + getFloatingPnl();
+    replayData = {prices:JSON.parse(JSON.stringify(priceHistory)), trades:[...trades]};
     setTimeout(()=> askSubmitToLeaderboard(totalPnl), 300);
     return;
   }
   simTime++;
+  showNews();
   Object.keys(quotes).forEach(code=>{
     const q = quotes[code];
     const chg = (Math.random()-0.5)*0.009;
@@ -225,7 +327,7 @@ function getFloatingPnl(){
     const abs = Math.abs(p.shares);
     pnl += p.shares>0 ? (price-p.cost)*abs : (p.cost-price)*abs;
   });
-  return pnl;
+  return pnl * leverage;
 }
 
 async function updateRealtime(){
@@ -327,7 +429,6 @@ function drawChart(){
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // B/S 买卖点
   trades.filter(t=>t.code===code).forEach(t=>{
     if(mode==='offline' && t.simTime > simTime) return;
     const idx = Math.min(prices.length-1, Math.floor((t.simTime/240)*prices.length));
@@ -382,13 +483,13 @@ function renderAll(){
     const isLong = p.shares>0;
     const abs = Math.abs(p.shares);
     const value = price * abs;
-    const profit = isLong ? (price-p.cost)*abs : (p.cost-price)*abs;
+    const profit = (isLong ? (price-p.cost)*abs : (p.cost-price)*abs) * leverage;
     mv += isLong ? value : -value;
     return `<tr>
       <td>${p.name}</td><td>${code}</td>
       <td>${isLong?'多':'空'}</td><td>${abs}</td>
       <td>${fmt(p.cost)}</td>
-      <td class="${color(isLong?price-p.cost:p.cost-price)}">${fmt(price)}</td>
+      <td class="${color(profit)}">${fmt(price)}</td>
       <td class="${color(profit)}">${profit>0?'+':''}${fmt(profit)}</td>
       <td><button class="sell" onclick="closePos('${code}')">平仓</button></td>
     </tr>`;
@@ -410,26 +511,28 @@ function openPos(code, side){
   const q = quotes[code];
   if(!q || !q.price){ alert('暂无行情，请先切到离线模拟'); return; }
   const price = q.price;
-  const qtyStr = prompt(`做${side==='long'?'多':'空'} ${q.name}（${code}）\n现价：${fmt(price)}\n输入股数（100整数倍）：`, '100');
+  const qtyStr = prompt(`做${side==='long'?'多':'空'} ${q.name}（${code}）\n现价：${fmt(price)}\n杠杆：${leverage}倍\n输入股数（100整数倍）：`, '100');
   if(!qtyStr) return;
   const qty = parseInt(qtyStr);
   if(isNaN(qty) || qty<=0 || qty%100!==0){ alert('请输入100的整数倍'); return; }
-  const amount = price * qty;
+  const amount = price * qty / leverage;
   if(amount > cash){ alert('资金不足'); return; }
   cash -= amount;
   if(!positions[code]) positions[code] = {shares:0, cost:0, name:q.name};
   const pos = positions[code];
   const oldAbs = Math.abs(pos.shares);
-  const totalCost = pos.cost * oldAbs + amount;
+  const totalCost = pos.cost * oldAbs + price * qty;
   pos.shares += (side==='long' ? qty : -qty);
   const newAbs = Math.abs(pos.shares);
   pos.cost = newAbs>0 ? totalCost / newAbs : 0;
   if(pos.shares===0) delete positions[code];
   trades.push({code, type:'B', price, simTime});
+  unlock('first','初次开仓');
+  playSound('buy');
   renderAll();
   document.getElementById('chartSelect').value = code;
   drawChart();
-  alert(`开仓成功！${side==='long'?'多':'空'} ${qty}股`);
+  alert(`开仓成功！${side==='long'?'多':'空'} ${qty}股（${leverage}倍）`);
 }
 
 function closePos(code){
@@ -438,11 +541,13 @@ function closePos(code){
   const q = quotes[code];
   if(!q || !q.price){ alert('暂无行情'); return; }
   const abs = Math.abs(pos.shares);
-  const profit = pos.shares>0 ? (q.price-pos.cost)*abs : (pos.cost-q.price)*abs;
+  const profit = (pos.shares>0 ? (q.price-pos.cost)*abs : (pos.cost-q.price)*abs) * leverage;
   realizedPnl += profit;
-  cash += q.price * abs;
+  if(pos.shares<0 && profit>0) unlock('shortwin','做空盈利');
+  cash += q.price * abs / leverage + profit;
   delete positions[code];
   trades.push({code, type:'S', price:q.price, simTime, pnl:profit});
+  playSound(profit>0?'win':'sell');
   renderAll();
   drawChart();
 }
@@ -472,6 +577,12 @@ function resetGame(){
   if(mode==='offline') initOffline();
 }
 
+function replay(){
+  if(!replayData) return alert('请先完成一次离线模拟');
+  alert('回放功能：可查看本次交易的 B/S 点和最终盈亏。完整动画回放可后续加强。');
+}
+
+renderAchievements();
 renderLeaderboard();
 updateChartSelect();
 setMode('realtime');
