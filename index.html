@@ -39,6 +39,7 @@
   .lb-item.me{background:#2a221e;border-radius:4px;padding:5px}
   .achieve{font-size:12px;padding:4px 0;border-bottom:1px solid #2a221e}
   .achieve.done{color:#52c41a}
+  #newsBox{margin-top:16px}
   .news{background:#3a2e28;padding:8px;border-radius:4px;margin:6px 0;font-size:13px}
   .news.good{border-left:3px solid #52c41a}
   .news.bad{border-left:3px solid #ff4d4f}
@@ -69,7 +70,6 @@
         <div class="progress-wrap"><div class="progress-bar" id="dayProgress"></div></div>
         <div style="font-size:12px;color:#8a7a6a;text-align:right" id="progressText">进度 0%</div>
       </div>
-      <div id="newsBox"></div>
       <div id="chartBox"><canvas id="chart"></canvas></div>
       <div class="indices" id="indices" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
       <div class="section">
@@ -97,6 +97,7 @@
           <tbody id="positions"></tbody>
         </table>
       </div>
+      <div id="newsBox"></div>
       <div style="font-size:12px;color:#8a7a6a;text-align:right;margin-top:8px" id="updateTime"></div>
     </div>
     <div class="sidebar">
@@ -255,7 +256,8 @@ function showNews(){
   const div = document.createElement('div');
   div.className = 'news '+(isGood?'good':'bad');
   div.textContent = '【消息】'+text;
-  document.getElementById('newsBox').prepend(div);
+  const box = document.getElementById('newsBox');
+  box.prepend(div);
   setTimeout(()=>div.remove(), 8000);
   Object.keys(quotes).forEach(code=>{
     const q = quotes[code];
@@ -579,7 +581,7 @@ function resetGame(){
 
 function replay(){
   if(!replayData) return alert('请先完成一次离线模拟');
-  alert('回放功能：可查看本次交易的 B/S 点和最终盈亏。完整动画回放可后续加强。');
+  alert('回放功能：可查看本次交易的 B/S 点和最终盈亏。');
 }
 
 renderAchievements();
